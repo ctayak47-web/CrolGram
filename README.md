@@ -1,46 +1,63 @@
-## Telegram messenger for Android
+# CrolGram
 
-[Telegram](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple and free.
-This repo contains the official source code for [Telegram App for Android](https://play.google.com/store/apps/details?id=org.telegram.messenger).
+Неофициальный клиент Telegram для Android с упором на **кастомизацию**.
+Привычный интерфейс Telegram остаётся на месте, меняется только оформление и добавляются удобные модули.
 
-## Creating your Telegram Application
+> ⚠️ CrolGram не является официальным приложением Telegram и не связан с Telegram Messenger Inc.
 
-We welcome all developers to use our API and source code to create applications on our platform.
-There are several things we require from **all developers** for the moment.
+## Идея
 
-1. [**Obtain your own api_id**](https://core.telegram.org/api/obtaining_api_id) for your application.
-2. Please **do not** use the name Telegram for your app — or make sure your users understand that it is unofficial.
-3. Kindly **do not** use our standard logo (white paper plane in a blue circle) as your app's logo.
-3. Please study our [**security guidelines**](https://core.telegram.org/mtproto/security_guidelines) and take good care of your users' data and privacy.
-4. Please remember to publish **your** code too in order to comply with the licences.
+Стиль в духе Nothing OS и liquid glass, зелёный акцент и градиенты везде, где это уместно. Структура экранов (список чатов, переписка, меню, настройки, жесты) не меняется, поэтому клиент ощущается родным.
 
-### API, Protocol documentation
+## Возможности
 
-Telegram API manuals: https://core.telegram.org/api
+Проект в разработке. Статус каждого пункта отмечен галочкой.
 
-MTproto protocol manuals: https://core.telegram.org/mtproto
+### Кастомизация (главное)
+- [ ] Движок тем: все экраны берут параметры из пресета
+- [ ] Градиентные пресеты: Неон, Лес, Кислота, Закат
+- [ ] Акцентный цвет, форма и прозрачность пузырей сообщений
+- [ ] Точечный шрифт для акцентов (счётчики, время, заголовки)
+- [ ] Эффект стекла (размытие) для шапки, поля ввода и шторок
+- [ ] Плотность списка чатов, обои, пакеты иконок, анимации
+- [ ] Настройки оформления для отдельных чатов
+- [ ] Режим «почти как обычный Telegram»
 
-### Compilation Guide
+### Приватность
+- [ ] Локальное сохранение удалённых и изменённых сообщений
+- [ ] Режим призрака (не отмечать прочитанным, скрыть «печатает»)
 
-**Note**: In order to support [reproducible builds](https://core.telegram.org/reproducible-builds), this repo contains dummy release.keystore,  google-services.json and filled variables inside BuildVars.java. Before publishing your own APKs please make sure to replace all these files with your own.
+### Автоматизация
+- [ ] Локальные правила («если сообщение от X с текстом Y, то ответить / закрепить / заглушить»)
+- [ ] Шаблоны ответов
+- [ ] Отложенные сообщения
 
-You will require Android Studio 2025.1.4, Android NDK 27.2.12479018 and Android SDK 36.
+## Принципы
 
-1. Clone the Telegram source code with its submodules:
-   ```bash
-   git clone --recursive --shallow-submodules https://github.com/DrKLO/Telegram.git Telegram
+- **Без серверов.** Всё работает на устройстве, клиент общается напрямую с Telegram.
+- **Модульность.** Каждая функция включается и выключается в настройках.
+- **Открытый код.** Лицензия GPL-2.0.
+
+## Сборка
+
+Проект основан на официальном репозиторием [Telegram-Android](https://github.com/TelegramMessenger/Telegram-Android).
+
+Требуется: Android Studio, Android SDK 36, Android NDK 27.2.12479018.
+
+1. Клонируйте репозиторий вместе с подмодулями:
    ```
-   In case you forgot the `--recursive` flag, change to the `Telegram` directory and run:
-   ```bash
-   git submodule init && git submodule update --init --recursive --depth=1
+   git clone --recursive --shallow-submodules <адрес-этого-репозитория>
    ```
-2. Copy your release.keystore into TMessagesProj/config
-3. Fill out RELEASE_KEY_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_STORE_PASSWORD in gradle.properties to access your  release.keystore
-4.  Go to https://console.firebase.google.com/, create two android apps with application IDs org.telegram.messenger and org.telegram.messenger.beta, turn on firebase messaging and download google-services.json, which should be copied to the same folder as TMessagesProj.
-5. Open the project in the Studio (note that it should be opened, NOT imported).
-6. Fill out values in TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java – there’s a link for each of the variables showing where and which data to obtain.
-7. You are ready to compile Telegram.
+2. Получите собственные `api_id` и `api_hash` на my.telegram.org и впишите их в `BuildVars.java`.
+3. Подставьте свои `release.keystore` и `google-services.json`.
+4. Откройте проект в Android Studio и соберите.
 
-### Localization
+Автоматическая сборка APK настроена через GitHub Actions: готовый файл можно скачать из раздела Artifacts.
 
-We moved all translations to https://translations.telegram.org/en/android/. Please use it.
+## Лицензия и благодарности
+
+Распространяется под GPL-2.0 (см. файл `LICENSE`). Основан на исходном коде официального приложения Telegram для Android. Название и логотип Telegram принадлежат их владельцам. Приложение использует собственный `api_id` и не использует стандартный логотип Telegram.
+
+## Автор
+
+crollow
