@@ -20,6 +20,7 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.HeaderCell;
+import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
@@ -38,6 +39,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int TYPE_CHECK = 1;
     private static final int TYPE_VALUE = 2;
     private static final int TYPE_INFO = 3;
+    private static final int TYPE_ICON = 4;
 
     private static final int K_HEADER = 0;
     private static final int K_SWITCH = 1;
@@ -69,6 +71,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
         String[] items;
         String page;
         int action;
+        int icon;
     }
 
     private final String page;
@@ -137,6 +140,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
         r.kind = K_LINK;
         r.title = title;
         r.page = page;
+        r.icon = iconFor(page);
         return r;
     }
 
@@ -146,6 +150,29 @@ public class CrolGramSettingsActivity extends BaseFragment {
         r.title = title;
         r.action = action;
         return r;
+    }
+
+    private static int iconFor(String page) {
+        switch (page) {
+            case "privacy": return R.drawable.msg_secret;
+            case "protect": return R.drawable.msg_block;
+            case "style": return R.drawable.msg_palette;
+            case "grad":
+            case "grad_me":
+            case "grad_others": return R.drawable.msg_customize;
+            case "profile": return R.drawable.msg_openprofile;
+            case "phone": return R.drawable.msg_contacts;
+            case "names": return R.drawable.msg_edit;
+            case "badges": return R.drawable.msg_premium_badge;
+            case "colors": return R.drawable.msg_palette;
+            case "banner": return R.drawable.msg_photo_settings;
+            case "gifts": return R.drawable.msg_gift_premium;
+            case "balance": return R.drawable.msg_filled_datausage;
+            case "tools": return R.drawable.msg_settings_old;
+            case "data": return R.drawable.msg_download;
+            case "debug": return R.drawable.msg_help;
+            default: return R.drawable.msg_info;
+        }
     }
 
     private static String[] withExtra(String[] base, String... extra) {
@@ -172,7 +199,6 @@ public class CrolGramSettingsActivity extends BaseFragment {
             case "gifts": return "Подарки и команды";
             case "balance": return "Баланс";
             case "tools": return "Инструменты";
-            case "translate": return "Перевод";
             case "data": return "Резервная копия";
             case "debug": return "Отладка";
             default: return "CrolGram";
@@ -205,6 +231,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(header("Оформление"));
                 rows.add(select("bubble_style", "Стиль пузырей", 0, "Стандартный", "Pixel", "Nothing", "Glass", "Liquid Glass"));
                 rows.add(select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик"));
+                rows.add(header("Ввод текста"));
+                rows.add(sw("anim_typing", "Анимация набора и стирания", "Плавный отклик поля при вводе и удалении текста", true));
                 rows.add(info("Стили пузырей применяются сразу. Форма аватарок меняется в списках и чатах, которые вы откроете заново. " + NOTE_LOCAL));
                 break;
             case "grad":
@@ -237,49 +265,39 @@ public class CrolGramSettingsActivity extends BaseFragment {
             case "profile":
                 rows.add(header("Мой профиль"));
                 rows.add(link("Номер телефона", "phone"));
-                rows.add(link("Имя и юзернеймы", "names"));
-                rows.add(link("Значок и эмодзи", "badges"));
+                rows.add(link("Имя, юзернейм и ID", "names"));
+                rows.add(link("Значок и эмодзи-статус", "badges"));
                 rows.add(link("Цвета профиля", "colors"));
-                rows.add(link("Баннер", "banner"));
-                rows.add(input("level_custom", "Уровень профиля", "", "Число, пусто = как есть"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(header("Показ в профилях"));
+                rows.add(sw("show_id", "Показывать ID", "В своём и чужих профилях", true));
+                rows.add(sw("show_dc", "Показывать дата-центр", "Например: 2, Amsterdam, NL (нужно фото профиля)", true));
+                rows.add(info(NOTE_LOCAL + " В своём профиле нажмите на ID, телефон или юзернейм, чтобы изменить отображение."));
                 break;
             case "phone":
                 rows.add(header("Номер телефона"));
                 rows.add(select("phone_mode", "Показывать номер", 0, "Как есть", "Анонимный +888", "Свой текст"));
                 rows.add(input("phone_custom", "Номер или текст", "", "Для +888: до 8 цифр"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(info(NOTE_LOCAL));
                 break;
             case "names":
-                rows.add(header("Имя и юзернеймы"));
+                rows.add(header("Имя, юзернейм и ID"));
                 rows.add(input("name_custom", "Своё имя", "", "Имя"));
                 rows.add(input("username_custom", "Свой юзернейм", "", "Без @"));
-                rows.add(input("usernames_extra", "Доп. юзернеймы", "", "Через запятую, без @"));
                 rows.add(input("id_custom", "Свой ID", "", "Число"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(info(NOTE_LOCAL));
                 break;
             case "badges":
-                rows.add(header("Значок и эмодзи"));
+                rows.add(header("Значок и эмодзи-статус"));
                 rows.add(select("badge_mode", "Значок", 0, "Нет", "Верификация", "Premium", "Scam", "Fake"));
                 rows.add(input("emoji_status_id", "Эмодзи-статус (ID)", "", "ID эмодзи"));
-                rows.add(input("verif_icon_id", "Иконка верификации (ID)", "", "ID эмодзи"));
-                rows.add(input("verif_desc", "Текст верификации", "Верифицирован Major", "Текст"));
-                rows.add(sw("emoji_pick", "Выбор эмодзи из сообщения", "Пункты в меню сообщения", false));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(info(NOTE_LOCAL + " Значок Premium меняет только отображение, платные функции не включаются."));
                 break;
             case "colors":
                 rows.add(header("Цвета профиля"));
                 rows.add(input("name_color_id", "Цвет ника (0–20)", "", "Число 0–20"));
                 rows.add(input("profile_color_id", "Цвет фона профиля (0–21)", "", "Число 0–21"));
                 rows.add(input("profile_emoji_id", "Узор профиля (ID эмодзи)", "", "ID эмодзи"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
-                break;
-            case "banner":
-                rows.add(header("Баннер"));
-                rows.add(select("banner_mode", "Тип баннера", 0, "Нет", "Градиент", "Картинка"));
-                rows.add(select("banner_grad", "Градиент", 0, PRESETS));
-                rows.add(input("banner_image", "Путь к картинке", "", "/storage/emulated/0/Download/banner.jpg"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(info(NOTE_LOCAL));
                 break;
             case "gifts":
                 rows.add(header("Подарки"));
@@ -298,15 +316,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 break;
             case "tools":
                 rows.add(header("Инструменты"));
-                rows.add(link("Перевод", "translate"));
-                rows.add(sw("copy_id", "«Скопировать ID» в меню", null, false));
-                rows.add(info(NOTE_LATER));
-                break;
-            case "translate":
-                rows.add(header("Перевод"));
-                rows.add(sw("translate", "«Перевести» в меню сообщения", null, false));
-                rows.add(input("translate_lang", "Язык перевода", "ru", "ru, en, uk, de, es…"));
-                rows.add(info(NOTE_LATER));
+                rows.add(sw("copy_id", "«Скопировать ID» в меню сообщения", "Копирует ID отправителя", false));
+                rows.add(info("«Перевести» уже есть в меню сообщения Telegram."));
                 break;
             case "data":
                 rows.add(header("Настройки CrolGram"));
@@ -435,40 +446,33 @@ public class CrolGramSettingsActivity extends BaseFragment {
         }
         builder.setItems(labels, (dialog, index) -> {
             CrolConfig.setInt(r.key, index);
+            org.telegram.messenger.CrolProfile.refreshSelf();
             adapter.notifyDataSetChanged();
         });
         showDialog(builder.create());
     }
 
     private void showInput(Row r) {
-        final Context context = getParentActivity();
-        if (context == null) {
+        if (getParentActivity() == null) {
             return;
         }
-        final EditText editText = new EditText(context);
-        editText.setInputType(InputType.TYPE_CLASS_TEXT);
-        editText.setText(CrolConfig.getString(r.key, r.defStr));
-        editText.setSelection(editText.getText().length());
-        editText.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-        editText.setHintTextColor(Theme.getColor(Theme.key_dialogTextHint));
-        if (r.sub != null) {
-            editText.setHint(r.sub);
-        }
-        editText.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(8), AndroidUtilities.dp(24), AndroidUtilities.dp(8));
+        boolean numeric = "id_custom".equals(r.key) || "name_color_id".equals(r.key) || "profile_color_id".equals(r.key)
+                || "profile_emoji_id".equals(r.key) || "emoji_status_id".equals(r.key);
+        CrolEditDialog.show(this, r.title, r.sub, CrolConfig.getString(r.key, r.defStr),
+                numeric ? InputType.TYPE_CLASS_NUMBER : InputType.TYPE_CLASS_TEXT,
+                new CrolEditDialog.Handler() {
+                    @Override
+                    public void onSave(String value) {
+                        CrolConfig.setString(r.key, value);
+                        adapter.notifyDataSetChanged();
+                    }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setTitle(r.title);
-        builder.setView(editText);
-        builder.setPositiveButton("Сохранить", (dialog, which) -> {
-            CrolConfig.setString(r.key, editText.getText().toString().trim());
-            adapter.notifyDataSetChanged();
-        });
-        builder.setNeutralButton("Сбросить", (dialog, which) -> {
-            CrolConfig.remove(r.key);
-            adapter.notifyDataSetChanged();
-        });
-        builder.setNegativeButton("Отмена", null);
-        showDialog(builder.create());
+                    @Override
+                    public void onReset() {
+                        CrolConfig.remove(r.key);
+                        adapter.notifyDataSetChanged();
+                    }
+                });
     }
 
     private void toast(String text) {
@@ -540,7 +544,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
             int type = holder.getItemViewType();
-            return type == TYPE_CHECK || type == TYPE_VALUE;
+            return type == TYPE_CHECK || type == TYPE_VALUE || type == TYPE_ICON;
         }
 
         @NonNull
@@ -551,6 +555,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 view = new HeaderCell(context);
             } else if (viewType == TYPE_CHECK) {
                 view = new TextCheckCell(context);
+            } else if (viewType == TYPE_ICON) {
+                view = new TextCell(context);
             } else if (viewType == TYPE_VALUE) {
                 TextSettingsCell cell = new TextSettingsCell(context);
                 cell.setCanDisable(true);
@@ -588,6 +594,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 } else {
                     cell.setTextAndCheck(r.title, checked, divider);
                 }
+            } else if (type == TYPE_ICON) {
+                ((TextCell) holder.itemView).setTextAndIcon(r.title, r.icon, divider);
             } else if (type == TYPE_VALUE) {
                 TextSettingsCell cell = (TextSettingsCell) holder.itemView;
                 if (r.kind == K_SELECT) {
@@ -620,8 +628,9 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 case K_GHOST:
                     return TYPE_CHECK;
                 case K_SELECT:
-                case K_INPUT:
                 case K_LINK:
+                    return TYPE_ICON;
+                case K_INPUT:
                 case K_ACTION:
                     return TYPE_VALUE;
                 default:

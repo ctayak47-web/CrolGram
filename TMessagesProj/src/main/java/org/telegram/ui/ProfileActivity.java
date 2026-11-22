@@ -671,6 +671,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int userInfoRow;
     private int channelInfoRow;
     private int usernameRow;
+    private int idRow;
+    private int dcRow;
     private int notificationsDividerRow;
     private int notificationsRow;
     private int bizHoursRow;
@@ -4308,6 +4310,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return;
             }
             listView.stopScroll();
+            if (crolHandleRowClick(position)) {
+                return;
+            }
             if (position == affiliateRow) {
                 TLRPC.User user = getMessagesController().getUser(userId);
                 if (userInfo != null && userInfo.starref_program != null) {
@@ -7432,6 +7437,58 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         });
         presentFragment(fragment);
+    }
+
+    /** CrolGram: нажатие на ID / DC / телефон / юзернейм. В своём профиле открывает «Изменить отображение». */
+    private boolean crolHandleRowClick(final int position) {
+        if (userId == 0 || position < 0) {
+            return false;
+        }
+        final Runnable refresh = () -> {
+            if (listAdapter != null) {
+                listAdapter.notifyDataSetChanged();
+            }
+        };
+        if (position == idRow || position == dcRow) {
+            final TLRPC.User u = getMessagesController().getUser(userId);
+            if (myProfile && position == idRow) {
+                org.telegram.ui.CrolEditDialog.showKey(this, "Изменить отображение: ID", "Число", "id_custom", android.text.InputType.TYPE_CLASS_NUMBER, refresh);
+                return true;
+            }
+            String text = position == idRow ? org.telegram.messenger.CrolProfile.idText(u) : org.telegram.messenger.CrolProfile.dcText(u);
+            if (AndroidUtilities.addToClipboard(text)) {
+                BulletinFactory.of(this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
+            }
+            return true;
+        }
+        if (!myProfile) {
+            return false;
+        }
+        if (position == phoneRow) {
+            org.telegram.ui.CrolEditDialog.show(this, "Изменить отображение: телефон", "Номер или текст",
+                    org.telegram.messenger.CrolConfig.getString("phone_custom", ""), android.text.InputType.TYPE_CLASS_TEXT,
+                    new org.telegram.ui.CrolEditDialog.Handler() {
+                        @Override
+                        public void onSave(String value) {
+                            org.telegram.messenger.CrolConfig.setString("phone_custom", value);
+                            org.telegram.messenger.CrolConfig.setInt("phone_mode", value.isEmpty() ? 0 : 2);
+                            refresh.run();
+                        }
+
+                        @Override
+                        public void onReset() {
+                            org.telegram.messenger.CrolConfig.remove("phone_custom");
+                            org.telegram.messenger.CrolConfig.setInt("phone_mode", 0);
+                            refresh.run();
+                        }
+                    });
+            return true;
+        }
+        if (position == usernameRow) {
+            org.telegram.ui.CrolEditDialog.showKey(this, "Изменить отображение: юзернейм", "Без @", "username_custom", android.text.InputType.TYPE_CLASS_TEXT, refresh);
+            return true;
+        }
+        return false;
     }
 
     private boolean processOnClickOrPress(final int position, final View view, final float x, final float y) {
@@ -10880,6 +10937,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         infoHeaderRowEmpty = -1;
         infoEndRowEmpty = -1;
         phoneRow = -1;
+        idRow = -1;
+        dcRow = -1;
         noteRow = -1;
         userInfoRow = -1;
         locationRow = -1;
@@ -11078,6 +11137,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (user != null && username != null) {
                     usernameRow = rowCount++;
+                }
+                if (user != null && org.telegram.messenger.CrolConfig.getBool("show_id", true)) {
+                    idRow = rowCount++;
+                    if (org.telegram.messenger.CrolConfig.getBool("show_dc", true)) {
+                        dcRow = rowCount++;
+                    }
                 }
                 if (userInfo != null) {
                     if (userInfo.birthday != null) {
@@ -13654,6 +13719,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                             containsGift = !myProfile && today && !getMessagesController().premiumPurchaseBlocked();
                         }
+                    } else if (position == idRow || position == dcRow) {
+                        final TLRPC.User crolUser = getMessagesController().getUser(userId);
+                        if (position == idRow) {
+                            detailCell.setTextAndValue(org.telegram.messenger.CrolProfile.idText(crolUser), "ID", dcRow != -1);
+                        } else {
+                            detailCell.setTextAndValue(org.telegram.messenger.CrolProfile.dcText(crolUser), "Дата-центр", false);
+                        }
                     } else if (position == phoneRow) {
                         String text;
                         TLRPC.User user = getMessagesController().getUser(userId);
@@ -14488,7 +14560,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
                 return VIEW_TYPE_HEADER;
-            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow) {
+            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow || position == idRow || position == dcRow) {
                 return VIEW_TYPE_TEXT_DETAIL;
             } else if (position == usernameRow || position == setUsernameRow) {
                 return VIEW_TYPE_TEXT_DETAIL_MULTILINE;
@@ -15813,6 +15885,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, infoHeaderRowEmpty, sparseIntArray);
             put(++pointer, infoEndRowEmpty, sparseIntArray);
             put(++pointer, phoneRow, sparseIntArray);
+            put(++pointer, idRow, sparseIntArray);
+            put(++pointer, dcRow, sparseIntArray);
             put(++pointer, noteRow, sparseIntArray);
             put(++pointer, locationRow, sparseIntArray);
             put(++pointer, userInfoRow, sparseIntArray);

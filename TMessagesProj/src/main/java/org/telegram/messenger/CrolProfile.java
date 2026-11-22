@@ -65,4 +65,136 @@ public class CrolProfile {
             return null;
         }
     }
+
+    // ------------------------------------------------------------ значки, эмодзи-статус, цвета
+
+    private static TLRPC.User origUser;
+    private static boolean oVerified, oPremium, oScam, oFake;
+    private static TLRPC.EmojiStatus oStatus;
+    private static TLRPC.PeerColor oColor, oProfileColor;
+
+    private static long parseLong(String v) {
+        try {
+            return TextUtils.isEmpty(v) ? 0 : Long.parseLong(v.trim());
+        } catch (Throwable e) {
+            return 0;
+        }
+    }
+
+    private static int parseInt(String v, int def) {
+        try {
+            return TextUtils.isEmpty(v) ? def : Integer.parseInt(v.trim());
+        } catch (Throwable e) {
+            return def;
+        }
+    }
+
+    /** Применяет локальные значки, эмодзи-статус и цвета к СВОЕМУ пользователю. Серверу ничего не уходит. */
+    public static void applySelf(TLRPC.User u) {
+        if (!isSelf(u)) {
+            return;
+        }
+        try {
+            if (origUser != u) {
+                origUser = u;
+                oVerified = u.verified;
+                oPremium = u.premium;
+                oScam = u.scam;
+                oFake = u.fake;
+                oStatus = u.emoji_status;
+                oColor = u.color;
+                oProfileColor = u.profile_color;
+            }
+            int badge = CrolConfig.getInt("badge_mode", 0);
+            u.verified = badge == 1 || (badge == 0 && oVerified);
+            u.premium = badge == 2 || (badge == 0 && oPremium);
+            u.scam = badge == 3 || (badge == 0 && oScam);
+            u.fake = badge == 4 || (badge == 0 && oFake);
+            if (badge == 3 || badge == 4) {
+                u.verified = false;
+            }
+
+            long status = parseLong(CrolConfig.getString("emoji_status_id", ""));
+            if (status != 0) {
+                TLRPC.TL_emojiStatus st = new TLRPC.TL_emojiStatus();
+                st.document_id = status;
+                u.emoji_status = st;
+            } else {
+                u.emoji_status = oStatus;
+            }
+
+            int nameColor = parseInt(CrolConfig.getString("name_color_id", ""), -1);
+            if (nameColor >= 0 && nameColor <= 20) {
+                TLRPC.TL_peerColor c = new TLRPC.TL_peerColor();
+                c.flags = 1;
+                c.color = nameColor;
+                u.color = c;
+            } else {
+                u.color = oColor;
+            }
+
+            int profColor = parseInt(CrolConfig.getString("profile_color_id", ""), -1);
+            long pattern = parseLong(CrolConfig.getString("profile_emoji_id", ""));
+            if ((profColor >= 0 && profColor <= 21) || pattern != 0) {
+                TLRPC.TL_peerColor c = new TLRPC.TL_peerColor();
+                if (profColor >= 0 && profColor <= 21) {
+                    c.flags |= 1;
+                    c.color = profColor;
+                } else {
+                    c.color = -1;
+                }
+                if (pattern != 0) {
+                    c.flags |= 2;
+                    c.background_emoji_id = pattern;
+                }
+                u.profile_color = c;
+            } else {
+                u.profile_color = oProfileColor;
+            }
+        } catch (Throwable e) {
+            CrolConfig.log("applySelf: " + e);
+        }
+    }
+
+    /** Применить настройки сейчас и обновить интерфейс. */
+    public static void refreshSelf() {
+        try {
+            int account = UserConfig.selectedAccount;
+            applySelf(UserConfig.getInstance(account).getCurrentUser());
+            NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+        } catch (Throwable e) {
+            CrolConfig.log("refreshSelf: " + e);
+        }
+    }
+
+    // ------------------------------------------------------------ ID и дата-центр
+
+    public static String idText(TLRPC.User user) {
+        if (user == null) {
+            return "";
+        }
+        if (user.self) {
+            String v = CrolConfig.getString("id_custom", "");
+            if (!TextUtils.isEmpty(v)) {
+                return v.trim();
+            }
+        }
+        return String.valueOf(user.id);
+    }
+
+    private static final String[] DC_PLACE = {
+            "", "Miami, US", "Amsterdam, NL", "Miami, US", "Amsterdam, NL", "Singapore, SG"
+    };
+
+    /** Например «2, Amsterdam, NL». Если дата-центр неизвестен (нет фото), показывает прочерк. */
+    public static String dcText(TLRPC.User user) {
+        int dc = 0;
+        if (user != null && user.photo != null) {
+            dc = user.photo.dc_id;
+        }
+        if (dc < 1 || dc >= DC_PLACE.length) {
+            return "Неизвестно (нет фото профиля)";
+        }
+        return dc + ", " + DC_PLACE[dc];
+    }
 }
