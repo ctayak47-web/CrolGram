@@ -1265,6 +1265,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_ADD_STICKER_TO_FAVORITES = 20;
     public final static int OPTION_DELETE_STICKER_FROM_FAVORITES = 21;
     public final static int OPTION_COPY_LINK = 22;
+    public final static int OPTION_CROL_EDIT_HISTORY = 900;
     public final static int OPTION_REPORT_CHAT = 23;
     public final static int OPTION_CANCEL_SENDING = 24;
     public final static int OPTION_UNVOTE = 25;
@@ -34964,6 +34965,24 @@ public class ChatActivity extends BaseFragment implements
                 getMediaDataController().addRecentSticker(MediaDataController.TYPE_FAVE, selectedObject, selectedObject.getDocument(), (int) (System.currentTimeMillis() / 1000), true);
                 break;
             }
+            case OPTION_CROL_EDIT_HISTORY: {
+                if (selectedObject != null && getParentActivity() != null) {
+                    java.util.ArrayList<String> crolHist = org.telegram.messenger.CrolConfig.getEditHistory(currentAccount, selectedObject.getDialogId(), selectedObject.getId());
+                    StringBuilder crolSb = new StringBuilder();
+                    for (int crolI = crolHist.size() - 1; crolI >= 0; crolI--) {
+                        if (crolSb.length() > 0) {
+                            crolSb.append("\n\n— — —\n\n");
+                        }
+                        crolSb.append(crolHist.get(crolI));
+                    }
+                    AlertDialog.Builder crolB = new AlertDialog.Builder(getParentActivity());
+                    crolB.setTitle("История правок");
+                    crolB.setMessage(crolSb.length() == 0 ? "Старых версий нет" : crolSb.toString());
+                    crolB.setPositiveButton("Закрыть", null);
+                    showDialog(crolB.create());
+                }
+                break;
+            }
             case OPTION_COPY_LINK: {
                 TLRPC.TL_channels_exportMessageLink req = new TLRPC.TL_channels_exportMessageLink();
                 if (selectedObject == replyingMessageObject && isComments) {
@@ -46687,6 +46706,11 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_COPY);
                     icons.add(R.drawable.msg_copy);
                 }
+                if (selectedObject != null && org.telegram.messenger.CrolConfig.hasEditHistory(currentAccount, selectedObject.getDialogId(), selectedObject.getId())) {
+                    items.add("История правок");
+                    options.add(OPTION_CROL_EDIT_HISTORY);
+                    icons.add(R.drawable.msg_edit);
+                }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {
                         items.add(LocaleController.formatPluralString("ViewReplies", primaryMessage.getRepliesCount()));
@@ -47004,6 +47028,11 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString(R.string.Copy));
                     options.add(OPTION_COPY);
                     icons.add(R.drawable.msg_copy);
+                }
+                if (selectedObject != null && org.telegram.messenger.CrolConfig.hasEditHistory(currentAccount, selectedObject.getDialogId(), selectedObject.getId())) {
+                    items.add("История правок");
+                    options.add(OPTION_CROL_EDIT_HISTORY);
+                    icons.add(R.drawable.msg_edit);
                 }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {

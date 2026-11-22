@@ -9346,6 +9346,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void deleteMessages(ArrayList<Integer> messages, ArrayList<Long> randoms, TLRPC.EncryptedChat encryptedChat, long dialogId, boolean forAll, int mode, boolean cacheOnly, long taskId, TLObject taskRequest, int topicId, boolean movedToScheduled, int movedToScheduledMessageId) {
+        CrolConfig.markOwnDelete();
         final boolean scheduled = mode == ChatActivity.MODE_SCHEDULED;
         final boolean quickReplies = mode == ChatActivity.MODE_QUICK_REPLIES;
         final boolean welcomeMessages = mode == ChatActivity.MODE_WELCOME_MESSAGES;
@@ -10080,6 +10081,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     protected void deleteDialog(long did, int first, int onlyHistory, int max_id, boolean revoke, TLRPC.InputPeer peer, long taskId) {
+        CrolConfig.markOwnDelete();
         if (onlyHistory == 2) {
             if (did == getUserConfig().getClientUserId()) {
                 getSavedMessagesController().deleteAllDialogs();
@@ -18894,6 +18896,10 @@ public class MessagesController extends BaseController implements NotificationCe
                 dialogs_read_outbox_max.put(dialogId, Math.max(value, update.max_id));
             } else if (baseUpdate instanceof TL_update.TL_updateDeleteMessages) {
                 TL_update.TL_updateDeleteMessages update = (TL_update.TL_updateDeleteMessages) baseUpdate;
+                if (CrolConfig.shouldKeepDeleted()) {
+                    CrolConfig.markDeleted(currentAccount, 0, new ArrayList<>(update.messages));
+                    continue;
+                }
                 if (deletedMessages == null) {
                     deletedMessages = new LongSparseArray<>();
                 }
@@ -19423,6 +19429,10 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d(baseUpdate + " channelId = " + update.channel_id);
                 }
+                if (CrolConfig.shouldKeepDeleted()) {
+                    CrolConfig.markDeleted(currentAccount, update.channel_id, new ArrayList<>(update.messages));
+                    continue;
+                }
                 if (deletedMessages == null) {
                     deletedMessages = new LongSparseArray<>();
                 }
@@ -19553,6 +19563,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 }
 
                 MessageObject.getDialogId(message);
+                CrolConfig.trackEdit(currentAccount, message);
 
                 ConcurrentHashMap<Long, Integer> read_max = message.out ? dialogs_read_outbox_max : dialogs_read_inbox_max;
                 Integer value = read_max.get(message.dialog_id);
@@ -23221,6 +23232,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void deleteMessagesRange(long dialogId, long channelId, int minDate, int maxDate, boolean forAll, Runnable callback) {
+        CrolConfig.markOwnDelete();
         TLRPC.TL_messages_deleteHistory req = new TLRPC.TL_messages_deleteHistory();
         req.peer = getInputPeer(dialogId);
         req.flags = (1 << 2) | (1 << 3);

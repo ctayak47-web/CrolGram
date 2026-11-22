@@ -15673,6 +15673,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             currentTimeString = TextUtils.concat("💎", StarsIntroActivity.formatTON(currentMessageObject.getStakedDiceAmount()), "  ", currentTimeString);
             currentTimeString = StarsIntroActivity.replaceDiamond(currentTimeString, 0.55f, null, 0, dp(-.33f), 1.05f);
         }
+        if (org.telegram.messenger.CrolConfig.isDeletedMarked(currentMessageObject)) {
+            android.text.SpannableString crolMark = new android.text.SpannableString("\uD83D\uDDD1 удалено · ");
+            crolMark.setSpan(new android.text.style.ForegroundColorSpan(0xFFE53935), 0, crolMark.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            currentTimeString = TextUtils.concat(crolMark, currentTimeString);
+        }
         final long starsPrice = currentMessageObject.getDialogId() < 0 ? getStarsPrice() : 0;
         if (starsPrice > 0) {
             currentTimeString = TextUtils.concat("⭐️", AndroidUtilities.formatWholeNumber((int) starsPrice, 0), "  ", currentTimeString);
