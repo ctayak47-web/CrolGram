@@ -1474,7 +1474,26 @@ public class LocaleController {
         if (value == null) {
             return "LOC_ERR:" + key;
         }
-        return value;
+        return crolBrand(value);
+    }
+
+    private static final String[] CROL_KEEP = {
+            "Telegram Premium", "Telegram Stars", "Telegram Passport", "Telegram Business",
+            "Telegram Ads", "Telegram Web", "Telegram Desktop", "Telegram Wallet", "Telegram Gifts"
+    };
+
+    // CrolGram: show our app name in UI texts (also in server translations),
+    // but keep names of Telegram's own services.
+    private static String crolBrand(String s) {
+        if (s == null || !s.contains("Telegram")) {
+            return s;
+        }
+        String r = s;
+        for (String k : CROL_KEEP) {
+            r = r.replace(k, k.replace("Telegram", "\u0000"));
+        }
+        r = r.replace("Telegram", "CrolGram");
+        return r.replace("\u0000", "Telegram");
     }
 
     public static String getServerString(String key) {
