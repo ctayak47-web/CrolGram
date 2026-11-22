@@ -56,9 +56,15 @@ jobs:
           if [ -n "$ABI" ]; then EXTRA="-Pandroid.injected.build.abi=$ABI"; fi
           ./gradlew :TMessagesProj_App:assembleAfatDebug $EXTRA --stacktrace
 
+      - name: List built APKs
+        if: always()
+        run: |
+          echo "::notice title=APK files::$(find . -name '*.apk' -not -path './.git/*' 2>/dev/null | head -20 | tr '\n' ' ')"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: CrolGram-debug-apk
-          path: TMessagesProj_App/build/outputs/apk/**/*.apk
+          path: |
+            **/build/outputs/**/*.apk
           if-no-files-found: error
