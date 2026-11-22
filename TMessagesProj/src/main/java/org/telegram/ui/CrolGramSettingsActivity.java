@@ -56,10 +56,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final String NOTE_LATER = "Эти параметры уже сохраняются, но начнут действовать в следующих обновлениях CrolGram.";
     private static final String NOTE_LOCAL = "Только на этом устройстве: другие люди и серверы Telegram ничего не увидят.";
 
-    private static final String[] PRESETS = {
-            "Закат", "Океан", "Радуга", "Неон", "Огонь", "Лёд", "Сакура", "Лайм", "Космос", "Золото",
-            "Мята", "Вишня", "Аврора", "Кислота", "Монохром"
-    };
+    private static final String[] PRESETS = org.telegram.messenger.CrolStyle.PRESET_NAMES;
 
     private static class Row {
         int kind;
@@ -201,13 +198,14 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(sw("anti_edit", "Анти-изменение", "Старые версии в меню сообщения «История правок»", false));
                 rows.add(sw("no_forward_bypass", "Снять запрет копирования", "Применяется к новым и заново загруженным чатам", false));
                 rows.add(sw("no_ads", "Убрать спонсорские сообщения", null, false));
+                rows.add(sw("ttl_media", "Исчезающие медиа как обычные", "Экспериментально: фото и видео с таймером открываются как обычные", false));
                 rows.add(info("Свои удаления работают как обычно. Остальные сообщения, удалённые собеседником, остаются только у вас."));
                 break;
             case "style":
                 rows.add(header("Оформление"));
                 rows.add(select("bubble_style", "Стиль пузырей", 0, "Стандартный", "Pixel", "Nothing", "Glass", "Liquid Glass"));
                 rows.add(select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик"));
-                rows.add(info(NOTE_LATER));
+                rows.add(info("Стили пузырей применяются сразу. Форма аватарок меняется в списках и чатах, которые вы откроете заново. " + NOTE_LOCAL));
                 break;
             case "grad":
                 rows.add(header("Градиенты"));
@@ -218,23 +216,23 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(sw("grad_dialogs", "В списке чатов", null, false));
                 rows.add(sw("grad_profile", "В профиле", null, false));
                 rows.add(sw("grad_title", "В шапке чата", null, false));
-                rows.add(sw("grad_drawer", "В боковом меню", null, false));
+                rows.add(sw("grad_drawer", "В Настройках (моё имя)", "В этой версии Telegram бокового меню нет", false));
                 rows.add(select("grad_text", "Текст сообщений", 0, "Нет", "Мои", "Чужие", "Все"));
                 rows.add(sw("name_glow", "Свечение ников", null, false));
                 rows.add(sw("grad_anim", "Анимация градиента", "Расходует больше батареи", false));
-                rows.add(info(NOTE_LATER));
+                rows.add(info("Градиенты применяются сразу. " + NOTE_LOCAL));
                 break;
             case "grad_me":
                 rows.add(header("Мой градиент"));
                 rows.add(select("grad_me", "Пресет", 13, withExtra(PRESETS, "Свой (HEX)")));
                 rows.add(input("grad_me_custom", "Свои цвета (HEX)", "#FF512F,#F09819,#FF0099", "2–8 цветов через запятую"));
-                rows.add(info("Свои цвета используются при выборе «Свой (HEX)». " + NOTE_LATER));
+                rows.add(info("Свои цвета используются при выборе «Свой (HEX)»."));
                 break;
             case "grad_others":
                 rows.add(header("Градиент для других"));
                 rows.add(select("grad_others", "Пресет", 16, withExtra(PRESETS, "Свой (HEX)", "Разный у каждого")));
                 rows.add(input("grad_others_custom", "Свои цвета (HEX)", "#00C6FF,#0072FF,#7F00FF", "2–8 цветов через запятую"));
-                rows.add(info("Свои цвета используются при выборе «Свой (HEX)». " + NOTE_LATER));
+                rows.add(info("Свои цвета используются при выборе «Свой (HEX)»."));
                 break;
             case "profile":
                 rows.add(header("Мой профиль"));

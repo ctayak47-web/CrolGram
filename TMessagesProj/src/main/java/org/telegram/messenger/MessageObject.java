@@ -10329,6 +10329,9 @@ public class MessageObject {
         if (isRepostPreview) {
             return false;
         }
+        if (CrolConfig.getBool("ttl_media", false) && !hasExtendedMediaPreview() && !isVoice() && !isRoundVideo()) {
+            return false;
+        }
         if (hasExtendedMediaPreview()) {
             return true;
         } else if (messageOwner instanceof TLRPC.TL_message_secret) {
@@ -10345,6 +10348,9 @@ public class MessageObject {
     }
 
     public boolean isSecretMedia() {
+        if (CrolConfig.getBool("ttl_media", false) && !isVoice() && !isRoundVideo()) {
+            return false;
+        }
         if (messageOwner instanceof TLRPC.TL_message_secret) {
             return (((getMedia(messageOwner) instanceof TLRPC.TL_messageMediaPhoto) || isGif()) && messageOwner.ttl > 0 && messageOwner.ttl <= 60 || isVoice() || isRoundVideo() || isVideo());
         } else if (messageOwner instanceof TLRPC.TL_message) {

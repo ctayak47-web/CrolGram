@@ -588,6 +588,14 @@ public class MessageDrawable extends Drawable {
             return;
         }
         Rect bounds = getBounds();
+        if (paintToUse == null && currentType != TYPE_PREVIEW && overrideColor == null && !themePreview && !isCompact() && org.telegram.messenger.CrolStyle.bubbleStyle() != 0) {
+            // CrolGram: свой стиль пузыря (Pixel / Nothing / Glass / Liquid Glass)
+            if (org.telegram.messenger.CrolStyle.drawBubble(canvas, org.telegram.messenger.CrolStyle.bubbleStyle(), bounds, isOut, isSelected,
+                    getColor(isOut ? Theme.key_chat_outBubble : Theme.key_chat_inBubble),
+                    getColor(isOut ? Theme.key_chat_messageTextOut : Theme.key_chat_messageTextIn), alpha)) {
+                return;
+            }
+        }
         if (paintToUse == null && paint.getStyle() == Paint.Style.FILL && gradientShader == null && overrideRoundRadius == 0 && overrideRounding <= 0) {
             Drawable background = getBackgroundDrawable();
             if (background != null) {

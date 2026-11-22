@@ -3842,9 +3842,18 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private GradientDrawable archiveFadeGradientDrawable;
     private int archiveFadeGradientDrawableColor;
 
-    @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
+        final boolean crolGradient = org.telegram.messenger.CrolStyle.beginDialogCell(currentDialogId);
+        try {
+            onDrawCrol(canvas);
+        } finally {
+            org.telegram.messenger.CrolStyle.end(crolGradient, this);
+        }
+    }
+
+    @SuppressLint("DrawAllocation")
+    private void onDrawCrol(Canvas canvas) {
         if (currentDialogId == 0 && customDialog == null) {
             return;
         }

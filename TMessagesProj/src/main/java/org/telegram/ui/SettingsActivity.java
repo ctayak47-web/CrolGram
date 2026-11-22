@@ -528,6 +528,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         avatarDrawable.setInfo(user);
         avatarView.setForUserOrChat(user, avatarDrawable);
         titleView.setText(UserObject.getUserName(user));
+        org.telegram.messenger.CrolStyle.applySelfName(titleView);
         final StringBuilder sb = new StringBuilder();
         if (user != null) {
             sb.append(PhoneFormat.getInstance().format("+" + user.phone));

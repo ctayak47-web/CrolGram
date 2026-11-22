@@ -9810,6 +9810,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        org.telegram.messenger.CrolStyle.applyProfileName(nameTextView, userId != 0 ? userId : -chatId);
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onResume();
         }

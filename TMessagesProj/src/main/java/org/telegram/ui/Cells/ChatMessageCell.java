@@ -17324,7 +17324,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     @SuppressLint("WrongCall")
     @Override
     protected void onDraw(Canvas canvas) {
-        drawInternal(canvas);
+        final boolean crolGradient = org.telegram.messenger.CrolStyle.beginMessageCell(currentMessageObject);
+        try {
+            drawInternal(canvas);
+        } finally {
+            org.telegram.messenger.CrolStyle.end(crolGradient, this);
+        }
     }
     public void drawInternal(Canvas canvas) {
         if (currentMessageObject == null) {

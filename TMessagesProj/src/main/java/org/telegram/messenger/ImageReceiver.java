@@ -2536,7 +2536,8 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
     }
 
     public void setRoundRadius(int value) {
-        setRoundRadius(new int[]{value, value, value, value});
+        int[] crolRadii = CrolStyle.avatarRadii(value);
+        setRoundRadius(crolRadii != null ? crolRadii : new int[]{value, value, value, value});
     }
 
     public void setRoundRadius(int tl, int tr, int br, int bl) {

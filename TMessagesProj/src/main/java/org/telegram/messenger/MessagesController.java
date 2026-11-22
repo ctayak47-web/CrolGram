@@ -6672,7 +6672,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isChatNoForwards(TLRPC.Chat chat) {
-        if (chat == null) {
+        if (chat == null || CrolConfig.noForwardsBypass()) {
             return false;
         }
         if (chat.migrated_to != null) {
@@ -6697,7 +6697,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isUserNoForwards(TLRPC.UserFull userFull) {
-        if (userFull == null) {
+        if (userFull == null || CrolConfig.noForwardsBypass()) {
             return false;
         }
 

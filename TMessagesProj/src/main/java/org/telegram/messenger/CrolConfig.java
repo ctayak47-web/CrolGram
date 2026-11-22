@@ -117,6 +117,9 @@ public class CrolConfig {
     }
 
     private static void notifyChanged(String key) {
+        if ("bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
+            CrolStyle.refreshUi();
+        }
         for (Listener l : listeners) {
             try {
                 l.onChanged(key);

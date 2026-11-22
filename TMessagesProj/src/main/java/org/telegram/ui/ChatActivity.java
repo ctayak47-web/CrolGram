@@ -30660,6 +30660,9 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onResume() {
         super.onResume();
+        if (avatarContainer != null) {
+            org.telegram.messenger.CrolStyle.applyChatTitle(avatarContainer.getTitleTextView(), dialog_id);
+        }
         checkShowBlur(false);
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
