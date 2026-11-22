@@ -79,6 +79,10 @@ public class UserObject {
         if (user == null || isDeleted(user)) {
             return LocaleController.getString(R.string.HiddenName);
         }
+        String crolName = CrolProfile.customName(user);
+        if (crolName != null) {
+            return crolName;
+        }
         String name = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(ContactsController.formatName(user.first_name, user.last_name)));
         return name.length() != 0 || TextUtils.isEmpty(user.phone) ? name : PhoneFormat.getInstance().format("+" + user.phone);
     }
@@ -86,6 +90,12 @@ public class UserObject {
     public static String getPublicUsername(TLRPC.User user, boolean editable) {
         if (user == null) {
             return null;
+        }
+        if (!editable) {
+            String crolUsername = CrolProfile.customUsername(user);
+            if (crolUsername != null) {
+                return crolUsername;
+            }
         }
         if (!TextUtils.isEmpty(user.username)) {
             return user.username;

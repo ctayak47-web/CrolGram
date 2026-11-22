@@ -188,6 +188,10 @@ public class PhoneFormat {
         if (!initialzed) {
             return orig;
         }
+        String crolPhone = org.telegram.messenger.CrolProfile.customPhone(orig);
+        if (crolPhone != null) {
+            return crolPhone;
+        }
         try {
             String str = strip(orig);
 
