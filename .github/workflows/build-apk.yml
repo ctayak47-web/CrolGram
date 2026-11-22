@@ -13,6 +13,10 @@ on:
       - "**.md"
       - "branding/**"
 
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,20 +48,20 @@ jobs:
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
 
-      - name: Build debug APK
+      - name: Build release APK
         env:
           ABI: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.abi || '' }}
         run: |
           chmod +x ./gradlew
           EXTRA=""
           if [ -n "$ABI" ]; then EXTRA="-Pandroid.injected.build.abi=$ABI"; fi
-          ./gradlew :TMessagesProj_App:assembleAfatDebug $EXTRA --stacktrace
+          ./gradlew :TMessagesProj_App:assembleAfatRelease $EXTRA --stacktrace
 
       - name: Verify, re-sign if needed, collect APK
         run: |
           SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           BT="$SDK/build-tools/36.0.0"
-          APK=$(find . -name app.apk -path '*afat/debug*' -not -path './.git/*' | head -1)
+          APK=$(find . -name app.apk -path '*afat/release*' -not -path './.git/*' | head -1)
           echo "APK: $APK"
           mkdir -p dist
           cp "$APK" dist/CrolGram.apk
@@ -79,6 +83,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CrolGram-debug-apk
+          name: CrolGram-apk
           path: dist/CrolGram.apk
           if-no-files-found: error
