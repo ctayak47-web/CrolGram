@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       abi:
-        description: "ABI (пусто = обычная сборка всех ABI; arm64-v8a = быстрая, но может не ставиться)"
-        default: ""
+        description: "ABI: arm64-v8a (быстро, для большинства телефонов), all (все 4 ABI)"
+        default: "arm64-v8a"
         required: false
   push:
     branches: [master]
@@ -21,6 +21,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 150
+
+    env:
+      ABI: ${{ github.event.inputs.abi || 'arm64-v8a' }}
+      CCACHE_DIR: /home/runner/.ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: include_file_mtime,time_macros
+      CCACHE_NOHASHDIR: "1"
+      CCACHE_BASEDIR: ${{ github.workspace }}
 
     steps:
       - name: Free disk space
@@ -40,22 +49,39 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
       - name: Install Android SDK components
         run: |
           SDKM="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKM" ]; then SDKM=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}" /usr/local/lib/android -name sdkmanager -type f 2>/dev/null | head -1); fi
-          echo "sdkmanager: $SDKM"
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Build release APK
-        env:
-          ABI: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.abi || '' }}
         run: |
           chmod +x ./gradlew
-          EXTRA=""
-          if [ -n "$ABI" ]; then EXTRA="-Pandroid.injected.build.abi=$ABI"; fi
+          ccache -z
+          EXTRA="-PcrolCcache=1"
+          if [ -n "$ABI" ] && [ "$ABI" != "all" ]; then EXTRA="$EXTRA -PcrolAbis=$ABI"; fi
           ./gradlew :TMessagesProj_App:assembleAfatRelease $EXTRA --stacktrace
+          echo "::notice title=ccache::$(ccache -s | tr '\n' ' ' | head -c 400)"
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ github.run_id }}
 
       - name: Verify, re-sign if needed, collect APK
         run: |
@@ -65,20 +91,17 @@ jobs:
           echo "APK: $APK"
           mkdir -p dist
           cp "$APK" dist/CrolGram.apk
-          unzip -tq dist/CrolGram.apk > /tmp/unzip.txt 2>&1 || true
-          echo "::notice title=zip test::$(tail -1 /tmp/unzip.txt)"
           if "$BT/apksigner" verify --verbose dist/CrolGram.apk > /tmp/verify.txt 2>&1; then
-            echo "::notice title=apksigner::VERIFIED $(tr '\n' ' ' < /tmp/verify.txt | head -c 300)"
+            echo "::notice title=apksigner::VERIFIED"
           else
             echo "::warning title=apksigner::FAILED $(tr '\n' ' ' < /tmp/verify.txt | head -c 400) -> re-signing"
             keytool -genkeypair -keystore /tmp/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             "$BT/zipalign" -f -p 4 dist/CrolGram.apk dist/aligned.apk
             "$BT/apksigner" sign --ks /tmp/debug.keystore --ks-pass pass:android --key-pass pass:android dist/aligned.apk
             mv dist/aligned.apk dist/CrolGram.apk
-            "$BT/apksigner" verify --verbose dist/CrolGram.apk | head -5
           fi
           "$BT/aapt2" dump badging dist/CrolGram.apk > /tmp/badging.txt 2>&1 || true
-          echo "::notice title=badging::$(grep -E "^package|sdkVersion|targetSdkVersion|native-code" /tmp/badging.txt | tr '\n' ' ' | head -c 600)"
+          echo "::notice title=badging::$(grep -E "^package|sdkVersion|native-code|application-label:" /tmp/badging.txt | tr '\n' ' ' | head -c 600)"
           ls -la dist
 
       - uses: actions/upload-artifact@v4

@@ -1816,6 +1816,13 @@ public class Theme {
                         themeAccent.backgroundGradientOverrideColor3 = 0xff333258;
                     }
                 }
+                // CrolGram: default outgoing bubble gradient "Acid" (green -> cyan)
+                if (isHome(themeAccent) && (name.equals("Blue") || name.equals("Day") || name.equals("Dark Blue") || name.equals("Night"))) {
+                    themeAccent.myMessagesAccentColor = 0xff2EE66B;
+                    themeAccent.myMessagesGradientAccentColor1 = 0xff1FD6E0;
+                    themeAccent.myMessagesGradientAccentColor2 = 0;
+                    themeAccent.myMessagesGradientAccentColor3 = 0;
+                }
                 themeAccentsMap.put(themeAccent.id, themeAccent);
                 themeAccents.add(themeAccent);
             }
