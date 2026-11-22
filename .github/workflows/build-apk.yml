@@ -66,5 +66,6 @@ jobs:
         with:
           name: CrolGram-debug-apk
           path: |
+            **/build/intermediates/apk/**/*.apk
             **/build/outputs/**/*.apk
           if-no-files-found: error
