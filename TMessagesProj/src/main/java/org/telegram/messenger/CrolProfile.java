@@ -223,6 +223,7 @@ public class CrolProfile {
             if (full.id != selfId) {
                 return;
             }
+            CrolGifts.prefetch();
             if (origFull != full) {
                 origFull = full;
                 oRating = full.stars_rating;

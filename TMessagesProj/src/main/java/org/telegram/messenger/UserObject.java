@@ -83,6 +83,10 @@ public class UserObject {
         if (crolName != null) {
             return crolName;
         }
+        String crolLocal = CrolGifts.localName(user.id);
+        if (crolLocal != null) {
+            return crolLocal;
+        }
         String name = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(ContactsController.formatName(user.first_name, user.last_name)));
         return name.length() != 0 || TextUtils.isEmpty(user.phone) ? name : PhoneFormat.getInstance().format("+" + user.phone);
     }

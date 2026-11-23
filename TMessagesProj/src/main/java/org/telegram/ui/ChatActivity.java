@@ -28139,6 +28139,10 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
         super.onTransitionAnimationEnd(isOpen, backward);
+        if (isOpen && !backward && dialog_id != 0) {
+            final long crolDid = dialog_id;
+            AndroidUtilities.runOnUIThread(() -> org.telegram.messenger.CrolGifts.replay(currentAccount, crolDid), 1500);
+        }
         if (isOpen) {
             if (backward) {
                 if (showPinBulletin && pinBulletin != null) {

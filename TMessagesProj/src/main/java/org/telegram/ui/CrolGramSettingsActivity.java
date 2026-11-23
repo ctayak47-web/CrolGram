@@ -54,6 +54,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int ACT_IMPORT = 2;
     private static final int ACT_COPY_LOG = 3;
     private static final int ACT_CLEAR_LOG = 4;
+    private static final int ACT_FORGET_GIFTS = 5;
 
     private static final String NOTE_LATER = "Эти параметры уже сохраняются, но начнут действовать в следующих обновлениях CrolGram.";
     private static final String NOTE_LOCAL = "Только на этом устройстве: другие люди и серверы Telegram ничего не увидят.";
@@ -317,13 +318,14 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(link("Баланс", "balance"));
                 rows.add(header("Команды"));
                 rows.add(sw("gift_cmd", "Команды в чате", ".нфт  .грам  .прем3/6/12  .призрак  .ник", false));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(action("Забыть локальные подарки", ACT_FORGET_GIFTS));
+                rows.add(info(NOTE_LOCAL + " Ссылки t.me/nft/... подтягиваются при открытии профиля. Команды в чате на сервер не отправляются."));
                 break;
             case "balance":
                 rows.add(header("Баланс"));
                 rows.add(input("stars_balance", "Баланс звёзд", "", "Только отображение"));
                 rows.add(input("gram_balance", "Баланс GRAM", "", "Только отображение"));
-                rows.add(info(NOTE_LOCAL + " " + NOTE_LATER));
+                rows.add(info(NOTE_LOCAL + " Меняется только показ баланса, покупки сервер проверяет по настоящему балансу."));
                 break;
             case "tools":
                 rows.add(header("Инструменты"));
@@ -533,6 +535,13 @@ public class CrolGramSettingsActivity extends BaseFragment {
             case ACT_CLEAR_LOG:
                 CrolConfig.clearLog();
                 toast("Лог очищен");
+                break;
+            case ACT_FORGET_GIFTS:
+                org.telegram.messenger.CrolGifts.forgetLocal();
+                toast("Локальные подарки забыты");
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
                 break;
             default:
                 break;

@@ -263,9 +263,9 @@ public class StarsController {
         }
         if (withMinus && minus > 0) {
             AmountUtils.Amount b = AmountUtils.Amount.ofSafe(balance);
-            return AmountUtils.Amount.fromDecimal(Math.max(0, b.asDecimal() - minus), b.currency).toTl();
+            return org.telegram.messenger.CrolGifts.balance(ton, AmountUtils.Amount.fromDecimal(Math.max(0, b.asDecimal() - minus), b.currency).toTl());
         }
-        return balance;
+        return org.telegram.messenger.CrolGifts.balance(ton, balance);
     }
 
     public boolean canUseTon() {
@@ -3758,6 +3758,7 @@ public class StarsController {
                 } else {
                     endReached = true;
                 }
+                org.telegram.messenger.CrolGifts.ensure(GiftsList.this);
                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.starUserGiftsLoaded, dialogId, GiftsList.this);
             }));
         }
