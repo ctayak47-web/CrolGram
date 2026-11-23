@@ -2,6 +2,7 @@ package org.telegram.messenger;
 
 import android.text.TextUtils;
 
+import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 
 /**
@@ -186,15 +187,35 @@ public class CrolProfile {
             "", "Miami, US", "Amsterdam, NL", "Miami, US", "Amsterdam, NL", "Singapore, SG"
     };
 
-    /** Например «2, Amsterdam, NL». Если дата-центр неизвестен (нет фото), показывает прочерк. */
-    public static String dcText(TLRPC.User user) {
+    private static int photoDc(TLRPC.Photo p) {
+        return p != null ? p.dc_id : 0;
+    }
+
+    /** Например «DC2, Amsterdam, NL». Если дата-центр неизвестен: «DC неизвестен». */
+    public static String dcText(TLRPC.User user, TLRPC.UserFull full) {
         int dc = 0;
-        if (user != null && user.photo != null) {
-            dc = user.photo.dc_id;
+        try {
+            if (user != null && user.self) {
+                dc = ConnectionsManager.getInstance(UserConfig.selectedAccount).getCurrentDatacenterId();
+            }
+            if (dc < 1 && user != null && user.photo != null) {
+                dc = user.photo.dc_id;
+            }
+            if (dc < 1 && full != null) {
+                dc = photoDc(full.profile_photo);
+                if (dc < 1) {
+                    dc = photoDc(full.personal_photo);
+                }
+                if (dc < 1) {
+                    dc = photoDc(full.fallback_photo);
+                }
+            }
+        } catch (Throwable e) {
+            CrolConfig.log("dcText: " + e);
         }
         if (dc < 1 || dc >= DC_PLACE.length) {
-            return "Неизвестно (нет фото профиля)";
+            return "DC неизвестен";
         }
-        return dc + ", " + DC_PLACE[dc];
+        return "DC" + dc + ", " + DC_PLACE[dc];
     }
 }

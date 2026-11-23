@@ -269,8 +269,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(link("Значок и эмодзи-статус", "badges"));
                 rows.add(link("Цвета профиля", "colors"));
                 rows.add(header("Показ в профилях"));
-                rows.add(sw("show_id", "Показывать ID", "В своём и чужих профилях", true));
-                rows.add(sw("show_dc", "Показывать дата-центр", "Например: 2, Amsterdam, NL (нужно фото профиля)", true));
+                rows.add(sw("show_id", "Показывать ID и дата-центр", "Одна строка в профиле пользователя: ID, под ним DC", true));
                 rows.add(info(NOTE_LOCAL + " В своём профиле нажмите на ID, телефон или юзернейм, чтобы изменить отображение."));
                 break;
             case "phone":

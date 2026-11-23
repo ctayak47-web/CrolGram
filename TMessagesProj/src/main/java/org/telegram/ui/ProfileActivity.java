@@ -672,7 +672,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int channelInfoRow;
     private int usernameRow;
     private int idRow;
-    private int dcRow;
     private int notificationsDividerRow;
     private int notificationsRow;
     private int bizHoursRow;
@@ -5025,6 +5024,18 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else if (position == noteRow) {
                     editNotes(view, position);
                     return true;
+                } else if (position == idRow && idRow != -1) {
+                    final TLRPC.User crolU = getMessagesController().getUser(userId);
+                    final String crolId = org.telegram.messenger.CrolProfile.idText(crolU);
+                    final String crolDc = org.telegram.messenger.CrolProfile.dcText(crolU, userInfo);
+                    AlertDialog.Builder crolB = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+                    crolB.setItems(new CharSequence[]{"Копировать ID", "Копировать DC"}, (d, which) -> {
+                        if (AndroidUtilities.addToClipboard(which == 0 ? crolId : crolDc)) {
+                            BulletinFactory.of(ProfileActivity.this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
+                        }
+                    });
+                    showDialog(crolB.create());
+                    return true;
                 } else {
                     if (editRow(view, position)) return true;
                     return processOnClickOrPress(position, view, view.getWidth() / 2f, (int) (view.getHeight() * .75f));
@@ -7449,14 +7460,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 listAdapter.notifyDataSetChanged();
             }
         };
-        if (position == idRow || position == dcRow) {
+        if (position == idRow) {
             final TLRPC.User u = getMessagesController().getUser(userId);
-            if (myProfile && position == idRow) {
+            if (myProfile) {
                 org.telegram.ui.CrolEditDialog.showKey(this, "Изменить отображение: ID", "Число", "id_custom", android.text.InputType.TYPE_CLASS_NUMBER, refresh);
                 return true;
             }
-            String text = position == idRow ? org.telegram.messenger.CrolProfile.idText(u) : org.telegram.messenger.CrolProfile.dcText(u);
-            if (AndroidUtilities.addToClipboard(text)) {
+            if (AndroidUtilities.addToClipboard(org.telegram.messenger.CrolProfile.idText(u))) {
                 BulletinFactory.of(this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
             }
             return true;
@@ -10938,7 +10948,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         infoEndRowEmpty = -1;
         phoneRow = -1;
         idRow = -1;
-        dcRow = -1;
         noteRow = -1;
         userInfoRow = -1;
         locationRow = -1;
@@ -11140,9 +11149,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (user != null && org.telegram.messenger.CrolConfig.getBool("show_id", true)) {
                     idRow = rowCount++;
-                    if (org.telegram.messenger.CrolConfig.getBool("show_dc", true)) {
-                        dcRow = rowCount++;
-                    }
                 }
                 if (userInfo != null) {
                     if (userInfo.birthday != null) {
@@ -13719,13 +13725,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                             containsGift = !myProfile && today && !getMessagesController().premiumPurchaseBlocked();
                         }
-                    } else if (position == idRow || position == dcRow) {
+                    } else if (position == idRow) {
                         final TLRPC.User crolUser = getMessagesController().getUser(userId);
-                        if (position == idRow) {
-                            detailCell.setTextAndValue(org.telegram.messenger.CrolProfile.idText(crolUser), "ID", dcRow != -1);
-                        } else {
-                            detailCell.setTextAndValue(org.telegram.messenger.CrolProfile.dcText(crolUser), "Дата-центр", false);
-                        }
+                        detailCell.setTextAndValue(org.telegram.messenger.CrolProfile.idText(crolUser), org.telegram.messenger.CrolProfile.dcText(crolUser, userInfo), position + 1 == birthdayRow || position + 1 == bizHoursRow || position + 1 == bizLocationRow || position + 1 == noteRow || position + 1 == locationRow);
                     } else if (position == phoneRow) {
                         String text;
                         TLRPC.User user = getMessagesController().getUser(userId);
@@ -14560,7 +14562,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
                 return VIEW_TYPE_HEADER;
-            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow || position == idRow || position == dcRow) {
+            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow || position == idRow) {
                 return VIEW_TYPE_TEXT_DETAIL;
             } else if (position == usernameRow || position == setUsernameRow) {
                 return VIEW_TYPE_TEXT_DETAIL_MULTILINE;
@@ -15886,7 +15888,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, infoEndRowEmpty, sparseIntArray);
             put(++pointer, phoneRow, sparseIntArray);
             put(++pointer, idRow, sparseIntArray);
-            put(++pointer, dcRow, sparseIntArray);
             put(++pointer, noteRow, sparseIntArray);
             put(++pointer, locationRow, sparseIntArray);
             put(++pointer, userInfoRow, sparseIntArray);
