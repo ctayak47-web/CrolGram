@@ -6115,6 +6115,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 showRichButton(lineCount > 2 && editable != null && !TextUtils.isEmpty(editable.toString().trim()));
             }
         });
+        org.telegram.ui.CrolEditDialog.attachChatAnimation(messageEditText);
         messageEditText.addTextChangedListener(new EditTextSuggestionsFix());
         messageEditText.setEnabled(messageEditTextEnabled);
         if (messageEditTextWatchers != null) {

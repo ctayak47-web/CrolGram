@@ -92,6 +92,39 @@ public class CrolEditDialog {
         });
     }
 
+    /** Лёгкая версия для поля ввода чата: только сдвиг и прозрачность, без масштаба; синие ползунки выделения. */
+    public static void attachChatAnimation(final EditTextBoldCursor et) {
+        if (!CrolConfig.getBool("anim_typing", true)) {
+            return;
+        }
+        et.setHandlesColor(ACCENT_BLUE);
+        et.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!CrolConfig.getBool("anim_typing", true) || Math.abs(count - before) > 3) {
+                    return;
+                }
+                et.animate().cancel();
+                if (count > before) {
+                    et.setAlpha(0.85f);
+                    et.animate().alpha(1f).setDuration(100).start();
+                } else if (count < before) {
+                    et.setTranslationX(-AndroidUtilities.dp(2));
+                    et.setAlpha(0.8f);
+                    et.animate().translationX(0).alpha(1f).setDuration(120).start();
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+    }
+
     public static void show(BaseFragment fragment, String title, String hint, String current, int inputType, Handler handler) {
         final Context context = fragment.getParentActivity();
         if (context == null) {
