@@ -133,19 +133,45 @@ jobs:
           unzip -l dist/CrolGram.apk | grep -E "lib/.*libtmessages|classes[0-9]*\.dex|AndroidManifest" | awk '{print $4" "$1}' | tr '\n' ' ' | head -c 600 | sed 's/^/::notice title=contents::/'
           ls -la dist
 
+      - name: Make arm64-only APK and check integrity
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BT="$SDK/build-tools/36.0.0"
+          # универсальный APK: целостность архива
+          unzip -tq dist/CrolGram.apk
+          # лёгкая версия только для 64-битных телефонов (меньше размер, надёжнее скачивание)
+          cp dist/CrolGram.apk dist/CrolGram-arm64.apk
+          if unzip -l dist/CrolGram-arm64.apk | grep -q "lib/armeabi-v7a/"; then
+            zip -q -d dist/CrolGram-arm64.apk 'lib/armeabi-v7a/*' 'lib/x86/*' 'lib/x86_64/*' || true
+          fi
+          "$BT/zipalign" -f -p 4 dist/CrolGram-arm64.apk dist/arm64-aligned.apk
+          "$BT/apksigner" sign --ks TMessagesProj/config/release.keystore --ks-pass pass:android --key-pass pass:android --ks-key-alias androidkey \
+            --min-sdk-version 23 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true dist/arm64-aligned.apk
+          mv dist/arm64-aligned.apk dist/CrolGram-arm64.apk
+          rm -f dist/arm64-aligned.apk.idsig dist/CrolGram-arm64.apk.idsig
+          "$BT/apksigner" verify --verbose dist/CrolGram-arm64.apk | head -8
+          unzip -tq dist/CrolGram-arm64.apk
+          "$BT/aapt2" dump badging dist/CrolGram-arm64.apk | grep -E "^package|native-code" | tr '\n' ' ' | sed 's/^/::notice title=arm64::/'
+          sha256sum dist/*.apk | tee dist/SHA256.txt
+          ls -la dist
+
       - name: Publish APK to GitHub Release (direct .apk download)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest dist/CrolGram.apk \
+          S1=$(sha256sum dist/CrolGram.apk | cut -d' ' -f1)
+          S2=$(sha256sum dist/CrolGram-arm64.apk | cut -d' ' -f1)
+          gh release create latest dist/CrolGram-arm64.apk dist/CrolGram.apk \
             --title "CrolGram (сборка #${{ github.run_number }})" \
-            --notes "Прямой APK (не zip): скачать CrolGram.apk и установить. Коммит ${GITHUB_SHA::7}. Сборка #${{ github.run_number }}." \
+            --notes "Прямой APK (не zip). Для большинства телефонов: CrolGram-arm64.apk (меньше размер). CrolGram.apk подходит и 32-битным. Если выдаёт «не удалось обработать пакет»: скачайте заново (сверьте размер) и удалите старую CrolGram, если она подписана другим ключом. Коммит ${GITHUB_SHA::7}, сборка #${{ github.run_number }}. SHA-256 arm64: ${S2}. SHA-256 universal: ${S1}." \
             --prerelease --target "$GITHUB_SHA"
           echo "::notice title=release::https://github.com/${{ github.repository }}/releases/tag/latest"
 
       - uses: actions/upload-artifact@v4
         with:
           name: CrolGram-apk
-          path: dist/CrolGram.apk
+          path: |
+            dist/CrolGram.apk
+            dist/CrolGram-arm64.apk
           if-no-files-found: error
