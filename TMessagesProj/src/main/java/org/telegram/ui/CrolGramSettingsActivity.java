@@ -268,6 +268,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(link("Имя, юзернейм и ID", "names"));
                 rows.add(link("Значок и эмодзи-статус", "badges"));
                 rows.add(link("Цвета профиля", "colors"));
+                rows.add(link("Баннер", "banner"));
                 rows.add(header("Показ в профилях"));
                 rows.add(sw("show_id", "Показывать ID и дата-центр", "Одна строка в профиле пользователя: ID, под ним DC", true));
                 rows.add(info(NOTE_LOCAL + " В своём профиле нажмите на ID, телефон или юзернейм, чтобы изменить отображение."));
@@ -283,12 +284,16 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(input("name_custom", "Своё имя", "", "Имя"));
                 rows.add(input("username_custom", "Свой юзернейм", "", "Без @"));
                 rows.add(input("id_custom", "Свой ID", "", "Число"));
-                rows.add(info(NOTE_LOCAL));
+                rows.add(input("usernames_extra", "Дополнительные юзернеймы", "", "Через запятую, без @"));
+                rows.add(info(NOTE_LOCAL + " Дополнительные юзернеймы показываются в строке юзернейма вашего профиля."));
                 break;
             case "badges":
                 rows.add(header("Значок и эмодзи-статус"));
                 rows.add(select("badge_mode", "Значок", 0, "Нет", "Верификация", "Premium", "Scam", "Fake"));
                 rows.add(input("emoji_status_id", "Эмодзи-статус (ID)", "", "ID эмодзи"));
+                rows.add(input("verif_icon_id", "Иконка верификации (ID эмодзи)", "", "ID эмодзи"));
+                rows.add(input("verif_desc", "Текст верификации", "", "Показывается при нажатии на значок"));
+                rows.add(input("level_custom", "Уровень профиля", "", "Число"));
                 rows.add(info(NOTE_LOCAL + " Значок Premium меняет только отображение, платные функции не включаются."));
                 break;
             case "colors":
@@ -297,6 +302,13 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 rows.add(input("profile_color_id", "Цвет фона профиля (0–21)", "", "Число 0–21"));
                 rows.add(input("profile_emoji_id", "Узор профиля (ID эмодзи)", "", "ID эмодзи"));
                 rows.add(info(NOTE_LOCAL));
+                break;
+            case "banner":
+                rows.add(header("Баннер профиля"));
+                rows.add(select("banner_mode", "Тип", 0, "Нет", "Градиент", "Картинка из файла"));
+                rows.add(select("banner_grad", "Градиент", 0, PRESETS));
+                rows.add(input("banner_image", "Путь к картинке", "", "/storage/emulated/0/Download/banner.jpg"));
+                rows.add(info(NOTE_LOCAL + " Баннер рисуется в шапке вашего профиля. Быстрый выбор: долгое нажатие на имя в своём профиле."));
                 break;
             case "gifts":
                 rows.add(header("Подарки"));
@@ -316,6 +328,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
             case "tools":
                 rows.add(header("Инструменты"));
                 rows.add(sw("copy_id", "«Скопировать ID» в меню сообщения", "Копирует ID отправителя", false));
+                rows.add(sw("emoji_pick", "Выбор эмодзи из сообщения", "Пункты «Поставить как эмодзи-статус» и «Как узор профиля» для Premium-эмодзи", false));
                 rows.add(info("«Перевести» уже есть в меню сообщения Telegram."));
                 break;
             case "data":

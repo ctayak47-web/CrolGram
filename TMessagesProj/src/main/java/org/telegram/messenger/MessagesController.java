@@ -7281,7 +7281,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public TLRPC.UserFull getUserFull(long uid) {
-        return fullUsers.get(uid);
+        TLRPC.UserFull crolFull = fullUsers.get(uid);
+        CrolProfile.applyFull(crolFull);
+        return crolFull;
     }
 
     public TLRPC.ChatFull getChatFull(long chatId) {
@@ -7806,6 +7808,7 @@ public class MessagesController extends BaseController implements NotificationCe
                             getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
                         }
                     }
+                    CrolProfile.applyFull(userFull);
                     fullUsers.put(user.id, userFull);
                     final boolean contactBlockedChanged = syncUserContactBlocked(user.id, userFull);
                     getTranslateController().updateDialogFull(user.id);
@@ -10524,6 +10527,7 @@ public class MessagesController extends BaseController implements NotificationCe
             }
             if (info != null) {
                 if (fullUsers.get(user.id) == null) {
+                    CrolProfile.applyFull(info);
                     fullUsers.put(user.id, info);
                     getTranslateController().updateDialogFull(user.id);
                     StarsController.getInstance(currentAccount).invalidateProfileGifts(info);

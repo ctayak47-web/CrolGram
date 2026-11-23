@@ -4,6 +4,8 @@ import android.text.TextUtils;
 
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_bots;
+import org.telegram.tgnet.tl.TL_stars;
 
 /**
  * CrolGram: локальная подмена отображения СВОЕГО профиля (этап 4).
@@ -73,6 +75,7 @@ public class CrolProfile {
     private static boolean oVerified, oPremium, oScam, oFake;
     private static TLRPC.EmojiStatus oStatus;
     private static TLRPC.PeerColor oColor, oProfileColor;
+    private static java.util.ArrayList<TLRPC.TL_username> oUsernames;
 
     private static long parseLong(String v) {
         try {
@@ -105,6 +108,7 @@ public class CrolProfile {
                 oStatus = u.emoji_status;
                 oColor = u.color;
                 oProfileColor = u.profile_color;
+                oUsernames = u.usernames;
             }
             int badge = CrolConfig.getInt("badge_mode", 0);
             u.verified = badge == 1 || (badge == 0 && oVerified);
@@ -152,8 +156,106 @@ public class CrolProfile {
             } else {
                 u.profile_color = oProfileColor;
             }
+
+            java.util.ArrayList<String> extra = extraUsernames();
+            if (!extra.isEmpty()) {
+                java.util.ArrayList<TLRPC.TL_username> list = new java.util.ArrayList<>();
+                String main = customUsername(u);
+                if (TextUtils.isEmpty(main)) {
+                    main = u.username;
+                }
+                if (!TextUtils.isEmpty(main)) {
+                    list.add(makeUsername(main));
+                }
+                for (String name : extra) {
+                    if (!name.equalsIgnoreCase(main)) {
+                        list.add(makeUsername(name));
+                    }
+                }
+                u.usernames = list;
+            } else {
+                u.usernames = oUsernames != null ? oUsernames : new java.util.ArrayList<>();
+            }
         } catch (Throwable e) {
             CrolConfig.log("applySelf: " + e);
+        }
+    }
+
+    private static TLRPC.TL_username makeUsername(String name) {
+        TLRPC.TL_username tu = new TLRPC.TL_username();
+        tu.username = name;
+        tu.active = true;
+        tu.editable = false;
+        tu.flags = 2;
+        return tu;
+    }
+
+    /** Дополнительные юзернеймы из настройки usernames_extra (через запятую, пробел или «;»). */
+    public static java.util.ArrayList<String> extraUsernames() {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        String raw = CrolConfig.getString("usernames_extra", "");
+        if (TextUtils.isEmpty(raw)) {
+            return out;
+        }
+        for (String part : raw.replace(";", ",").replace(" ", ",").split(",")) {
+            String v = part.trim();
+            if (v.startsWith("@")) {
+                v = v.substring(1);
+            }
+            if (!v.isEmpty()) {
+                out.add(v);
+            }
+        }
+        return out;
+    }
+
+    private static TLRPC.UserFull origFull;
+    private static TL_stars.Tl_starsRating oRating;
+    private static TL_bots.BotVerification oVerification;
+
+    /** Локальный уровень профиля и иконка/текст верификации в СВОЁМ UserFull. Серверу ничего не уходит. */
+    public static void applyFull(TLRPC.UserFull full) {
+        if (full == null) {
+            return;
+        }
+        try {
+            long selfId = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+            if (full.id != selfId) {
+                return;
+            }
+            if (origFull != full) {
+                origFull = full;
+                oRating = full.stars_rating;
+                oVerification = full.bot_verification;
+            }
+            String lvl = CrolConfig.getString("level_custom", "").trim();
+            if (!lvl.isEmpty() && TextUtils.isDigitsOnly(lvl) && lvl.length() < 5) {
+                int level = Integer.parseInt(lvl);
+                TL_stars.Tl_starsRating r = new TL_stars.Tl_starsRating();
+                long cur = 25L * level * level;
+                long next = 25L * (level + 1) * (level + 1);
+                r.flags = 1;
+                r.level = level;
+                r.current_level_stars = cur;
+                r.stars = cur + (next - cur) / 2;
+                r.next_level_stars = next;
+                full.stars_rating = r;
+            } else {
+                full.stars_rating = oRating;
+            }
+            long icon = parseLong(CrolConfig.getString("verif_icon_id", ""));
+            if (icon != 0) {
+                TL_bots.BotVerification bv = new TL_bots.BotVerification();
+                bv.bot_id = selfId;
+                bv.icon = icon;
+                bv.description = new TLRPC.TL_textWithEntities();
+                bv.description.text = CrolConfig.getString("verif_desc", "");
+                full.bot_verification = bv;
+            } else {
+                full.bot_verification = oVerification;
+            }
+        } catch (Throwable e) {
+            CrolConfig.log("applyFull: " + e);
         }
     }
 
@@ -162,6 +264,7 @@ public class CrolProfile {
         try {
             int account = UserConfig.selectedAccount;
             applySelf(UserConfig.getInstance(account).getCurrentUser());
+            applyFull(MessagesController.getInstance(account).getUserFull(UserConfig.getInstance(account).getClientUserId()));
             NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
         } catch (Throwable e) {
             CrolConfig.log("refreshSelf: " + e);

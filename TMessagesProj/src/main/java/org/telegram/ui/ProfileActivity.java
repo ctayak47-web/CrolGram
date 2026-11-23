@@ -1397,6 +1397,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     backgroundPaint.setAlpha((int) (0xFF * progressToGradient));
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, backgroundPaint);
                 }
+                if (myProfile && userId != 0 && org.telegram.messenger.CrolBanner.isActive()) {
+                    canvas.save();
+                    canvas.clipRect(0, 0, getMeasuredWidth(), y1);
+                    org.telegram.messenger.CrolBanner.draw(canvas, getMeasuredWidth(), y1);
+                    canvas.restore();
+                }
                 if (hasEmoji && !capturing) {
                     final float loadedScale = emojiLoadedT.set(isEmojiLoaded());
                     boolean shoudIgnore = openAnimationInProgress && playProfileAnimation == 2;
@@ -5206,6 +5212,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         topView = new TopView(context);
+        if (myProfile && userId != 0) {
+            topView.setOnLongClickListener(v -> {
+                crolShowHeaderMenu();
+                return true;
+            });
+        }
         topView.setBackgroundColorId(peerColor, false);
         topView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         frameLayout.addView(topView);
@@ -5544,6 +5556,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         nameTextView.setScrollNonFitText(true);
         nameTextView.setFocusable(true);
         nameTextView.setEllipsizeByGradient(true);
+        if (myProfile && userId != 0) {
+            nameTextView.setOnClickListener(v -> {
+                org.telegram.ui.CrolEditDialog.showKey(ProfileActivity.this, "Изменить отображение: имя", "Имя", "name_custom",
+                        android.text.InputType.TYPE_CLASS_TEXT, () -> {
+                            if (listAdapter != null) {
+                                listAdapter.notifyDataSetChanged();
+                            }
+                        });
+            });
+            nameTextView.setOnLongClickListener(v -> {
+                crolShowHeaderMenu();
+                return true;
+            });
+        }
         avatarContainer2.addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 109, -6, 0, 0));
 
         onlineTextView = new AnimatedClickableSmallTextView(context) {
@@ -7450,7 +7476,88 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         presentFragment(fragment);
     }
 
-    /** CrolGram: нажатие на ID / DC / телефон / юзернейм. В своём профиле открывает «Изменить отображение». */
+    /** CrolGram: меню значка и баннера (долгое нажатие на имя или шапку своего профиля). Только локально. */
+    private void crolShowHeaderMenu() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+        b.setTitle("Значок и баннер (только на этом устройстве)");
+        b.setItems(new CharSequence[]{"Выбрать значок", "Выбрать баннер"}, (d, which) -> {
+            if (which == 0) {
+                crolPickBadge();
+            } else {
+                crolPickBanner();
+            }
+        });
+        showDialog(b.create());
+    }
+
+    private void crolPickBadge() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+        b.setTitle("Значок");
+        b.setItems(new CharSequence[]{"Как в аккаунте", "Верификация", "Premium", "Scam", "Fake"}, (d, which) -> {
+            org.telegram.messenger.CrolConfig.setInt("badge_mode", which);
+            org.telegram.messenger.CrolProfile.refreshSelf();
+        });
+        showDialog(b.create());
+    }
+
+    private void crolPickBanner() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+        b.setTitle("Баннер");
+        b.setItems(new CharSequence[]{"Нет", "Градиент", "Картинка из файла"}, (d, which) -> {
+            if (which == 0) {
+                org.telegram.messenger.CrolConfig.setInt("banner_mode", 0);
+                crolBannerChanged();
+            } else if (which == 1) {
+                AlertDialog.Builder gb = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+                gb.setTitle("Градиент баннера");
+                gb.setItems(org.telegram.messenger.CrolStyle.PRESET_NAMES, (d2, idx) -> {
+                    org.telegram.messenger.CrolConfig.setInt("banner_grad", idx);
+                    org.telegram.messenger.CrolConfig.setInt("banner_mode", 1);
+                    crolBannerChanged();
+                });
+                showDialog(gb.create());
+            } else {
+                org.telegram.ui.CrolEditDialog.show(this, "Баннер: путь к картинке", "/storage/emulated/0/Download/banner.jpg",
+                        org.telegram.messenger.CrolConfig.getString("banner_image", ""), android.text.InputType.TYPE_CLASS_TEXT,
+                        new org.telegram.ui.CrolEditDialog.Handler() {
+                            @Override
+                            public void onSave(String value) {
+                                org.telegram.messenger.CrolConfig.setString("banner_image", value);
+                                org.telegram.messenger.CrolConfig.setInt("banner_mode", value.isEmpty() ? 0 : 2);
+                                crolBannerChanged();
+                            }
+
+                            @Override
+                            public void onReset() {
+                                org.telegram.messenger.CrolConfig.remove("banner_image");
+                                org.telegram.messenger.CrolConfig.setInt("banner_mode", 0);
+                                crolBannerChanged();
+                            }
+                        });
+            }
+        });
+        showDialog(b.create());
+    }
+
+    private void crolBannerChanged() {
+        if (topView != null) {
+            topView.invalidate();
+        }
+        if (listAdapter != null) {
+            listAdapter.notifyDataSetChanged();
+        }
+    }
+
+    /** CrolGram: нажатие на ID / телефон / юзернейм. В своём профиле открывает «Изменить отображение». */
     private boolean crolHandleRowClick(final int position) {
         if (userId == 0 || position < 0) {
             return false;
@@ -13778,6 +13885,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             if (user != null && !TextUtils.isEmpty(user.username)) {
                                 usernameObj = DialogObject.findUsername(user.username, usernames);
                                 username = user.username;
+                                String crolUn = org.telegram.messenger.CrolProfile.customUsername(user);
+                                if (crolUn != null) {
+                                    username = crolUn;
+                                    usernameObj = DialogObject.findUsername(crolUn, usernames);
+                                }
                             }
                             usernames = user == null ? new ArrayList<>() : new ArrayList<>(user.usernames);
                             if (TextUtils.isEmpty(username) && usernames != null) {

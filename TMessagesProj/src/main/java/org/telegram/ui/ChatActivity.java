@@ -1266,6 +1266,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_DELETE_STICKER_FROM_FAVORITES = 21;
     public final static int OPTION_COPY_LINK = 22;
     public final static int OPTION_CROL_EDIT_HISTORY = 900;
+    public final static int OPTION_CROL_EMOJI_STATUS = 902;
+    public final static int OPTION_CROL_EMOJI_PATTERN = 903;
     public final static int OPTION_CROL_COPY_ID = 901;
     public final static int OPTION_REPORT_CHAT = 23;
     public final static int OPTION_CANCEL_SENDING = 24;
@@ -34292,6 +34294,21 @@ public class ChatActivity extends BaseFragment implements
         MediaController.saveFile(path, getParentActivity(), messageObject.isVideo() ? 1 : 0, null, null);
     }
 
+    private long crolFirstCustomEmoji(MessageObject mo) {
+        try {
+            if (mo != null && mo.messageOwner != null && mo.messageOwner.entities != null) {
+                for (int i = 0; i < mo.messageOwner.entities.size(); i++) {
+                    TLRPC.MessageEntity e = mo.messageOwner.entities.get(i);
+                    if (e instanceof TLRPC.TL_messageEntityCustomEmoji) {
+                        return ((TLRPC.TL_messageEntityCustomEmoji) e).document_id;
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return 0;
+    }
+
     private void processSelectedOption(int option) {
         if (selectedObject == null || getParentActivity() == null) {
             return;
@@ -34978,6 +34995,19 @@ public class ChatActivity extends BaseFragment implements
                     if (AndroidUtilities.addToClipboard(String.valueOf(Math.abs(crolFrom)))) {
                         BulletinFactory.of(this).createCopyBulletin("ID скопирован").show();
                     }
+                }
+                break;
+            }
+            case OPTION_CROL_EMOJI_STATUS:
+            case OPTION_CROL_EMOJI_PATTERN: {
+                long crolEmoji = selectedObject != null ? crolFirstCustomEmoji(selectedObject) : 0;
+                if (crolEmoji != 0) {
+                    boolean crolStatus = option == OPTION_CROL_EMOJI_STATUS;
+                    org.telegram.messenger.CrolConfig.setString(crolStatus ? "emoji_status_id" : "profile_emoji_id", String.valueOf(crolEmoji));
+                    org.telegram.messenger.CrolProfile.refreshSelf();
+                    BulletinFactory.of(this).createCopyBulletin((crolStatus ? "Эмодзи-статус: " : "Узор профиля: ") + crolEmoji + " (только на этом устройстве)").show();
+                } else {
+                    BulletinFactory.of(this).createCopyBulletin("В сообщении нет Premium-эмодзи").show();
                 }
                 break;
             }
@@ -46732,6 +46762,14 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_CROL_COPY_ID);
                     icons.add(R.drawable.msg_copy);
                 }
+                if (selectedObject != null && org.telegram.messenger.CrolConfig.getBool("emoji_pick", false) && crolFirstCustomEmoji(selectedObject) != 0) {
+                    items.add("Поставить как эмодзи-статус");
+                    options.add(OPTION_CROL_EMOJI_STATUS);
+                    icons.add(R.drawable.msg_premium_badge);
+                    items.add("Как узор профиля");
+                    options.add(OPTION_CROL_EMOJI_PATTERN);
+                    icons.add(R.drawable.msg_customize);
+                }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {
                         items.add(LocaleController.formatPluralString("ViewReplies", primaryMessage.getRepliesCount()));
@@ -47059,6 +47097,14 @@ public class ChatActivity extends BaseFragment implements
                     items.add("Скопировать ID");
                     options.add(OPTION_CROL_COPY_ID);
                     icons.add(R.drawable.msg_copy);
+                }
+                if (selectedObject != null && org.telegram.messenger.CrolConfig.getBool("emoji_pick", false) && crolFirstCustomEmoji(selectedObject) != 0) {
+                    items.add("Поставить как эмодзи-статус");
+                    options.add(OPTION_CROL_EMOJI_STATUS);
+                    icons.add(R.drawable.msg_premium_badge);
+                    items.add("Как узор профиля");
+                    options.add(OPTION_CROL_EMOJI_PATTERN);
+                    icons.add(R.drawable.msg_customize);
                 }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {
