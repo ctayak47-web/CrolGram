@@ -58,8 +58,22 @@ public class CrolConfig {
 
     // ---------------------------------------------------------------- типизированные геттеры и сеттеры
 
+    /** Украшения, которые отключает режим «почти как Telegram» (значения сохраняются). */
+    private static final HashSet<String> PLAIN_BOOL = new HashSet<>(java.util.Arrays.asList(
+            "gradient_names", "grad_replies", "grad_dialogs", "grad_profile", "grad_title", "grad_drawer",
+            "name_glow", "grad_anim", "anim_typing"));
+    private static final HashSet<String> PLAIN_INT = new HashSet<>(java.util.Arrays.asList(
+            "bubble_style", "avatar_shape", "grad_text", "banner_mode"));
+
+    /** Значение с учётом режима «почти как Telegram» и тихих часов. */
     public static boolean getBool(String key, boolean def) {
         try {
+            if (PLAIN_BOOL.contains(key) && p().getBoolean("plain_mode", false)) {
+                return false;
+            }
+            if (isGhostKey(key) && isQuietNow()) {
+                return true;
+            }
             return p().getBoolean(key, def);
         } catch (Throwable e) {
             return def;
@@ -68,9 +82,77 @@ public class CrolConfig {
 
     public static int getInt(String key, int def) {
         try {
+            if (PLAIN_INT.contains(key) && p().getBoolean("plain_mode", false)) {
+                return 0;
+            }
             return p().getInt(key, def);
         } catch (Throwable e) {
             return def;
+        }
+    }
+
+    /** Сохранённое значение без наложений (для экрана настроек). */
+    public static boolean getRawBool(String key, boolean def) {
+        try {
+            return p().getBoolean(key, def);
+        } catch (Throwable e) {
+            return def;
+        }
+    }
+
+    public static int getRawInt(String key, int def) {
+        try {
+            return p().getInt(key, def);
+        } catch (Throwable e) {
+            return def;
+        }
+    }
+
+    private static boolean isGhostKey(String key) {
+        for (String k : GHOST_KEYS) {
+            if (k.equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ---------------------------------------------------------------- тихие часы
+
+    private static int parseMinutes(String text, int def) {
+        try {
+            String[] a = text.trim().split("[:.]");
+            int h = Integer.parseInt(a[0].trim());
+            int m = a.length > 1 ? Integer.parseInt(a[1].trim()) : 0;
+            if (h < 0 || h > 23 || m < 0 || m > 59) {
+                return def;
+            }
+            return h * 60 + m;
+        } catch (Throwable e) {
+            return def;
+        }
+    }
+
+    /** Сейчас действуют тихие часы (расписание включено и время попадает в интервал). */
+    public static boolean isQuietNow() {
+        try {
+            SharedPreferences s = p();
+            if (!s.getBoolean("quiet_on", false)) {
+                return false;
+            }
+            int from = parseMinutes(s.getString("quiet_from", "22:00"), 22 * 60);
+            int to = parseMinutes(s.getString("quiet_to", "07:00"), 7 * 60);
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            int now = c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE);
+            if (from == to) {
+                return false;
+            }
+            if (from < to) {
+                return now >= from && now < to;
+            }
+            return now >= from || now < to;
+        } catch (Throwable e) {
+            return false;
         }
     }
 
@@ -117,7 +199,7 @@ public class CrolConfig {
     }
 
     private static void notifyChanged(String key) {
-        if ("bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
+        if (key == null || "plain_mode".equals(key) || "bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
             CrolStyle.refreshUi();
         }
         for (Listener l : listeners) {
@@ -132,7 +214,7 @@ public class CrolConfig {
 
     public static boolean isGhost() {
         for (String k : GHOST_KEYS) {
-            if (!getBool(k, false)) {
+            if (!getRawBool(k, false)) {
                 return false;
             }
         }

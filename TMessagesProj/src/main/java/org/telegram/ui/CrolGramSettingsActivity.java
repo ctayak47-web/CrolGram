@@ -1,11 +1,22 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.Typeface;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -13,7 +24,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CrolConfig;
+import org.telegram.messenger.CrolPresets;
+import org.telegram.messenger.CrolSettingsRegistry;
+import org.telegram.messenger.CrolSettingsRegistry.Entry;
+import org.telegram.messenger.CrolSettingsRegistry.Setting;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
@@ -24,14 +40,15 @@ import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 
 import java.util.ArrayList;
 
 /**
- * Раздел настроек «CrolGram». Все страницы строятся из одного списка строк (см. buildPage).
- * Значения хранятся в CrolConfig (SharedPreferences "crolgram").
+ * Раздел настроек «CrolGram». Страницы строятся из реестра CrolSettingsRegistry:
+ * главная (шапка, поиск, быстрые переключатели, избранное, разделы), страницы разделов, поиск, профили оформления.
  */
 public class CrolGramSettingsActivity extends BaseFragment {
 
@@ -40,6 +57,10 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int TYPE_VALUE = 2;
     private static final int TYPE_INFO = 3;
     private static final int TYPE_ICON = 4;
+    private static final int TYPE_CARD = 5;
+    private static final int TYPE_TILES = 6;
+    private static final int TYPE_SEARCH = 7;
+    private static final int TYPE_ICON_VALUE = 8;
 
     private static final int K_HEADER = 0;
     private static final int K_SWITCH = 1;
@@ -49,323 +70,241 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int K_ACTION = 5;
     private static final int K_INFO = 6;
     private static final int K_GHOST = 7;
+    private static final int K_CARD = 8;
+    private static final int K_TILES = 9;
+    private static final int K_SEARCH = 10;
+    private static final int K_RESULT = 11;
+    private static final int K_SECTION = 12;
+    private static final int K_BUILTIN = 13;
+    private static final int K_SAVED = 14;
 
-    private static final int ACT_EXPORT = 1;
-    private static final int ACT_IMPORT = 2;
-    private static final int ACT_COPY_LOG = 3;
-    private static final int ACT_CLEAR_LOG = 4;
-    private static final int ACT_FORGET_GIFTS = 5;
+    private static final int ACT_RESET_PAGE = 100;
 
-    private static final String NOTE_LATER = "Эти параметры уже сохраняются, но начнут действовать в следующих обновлениях CrolGram.";
-    private static final String NOTE_LOCAL = "Только на этом устройстве: другие люди и серверы Telegram ничего не увидят.";
-
-    private static final String[] PRESETS = org.telegram.messenger.CrolStyle.PRESET_NAMES;
+    private static final int ACCENT = 0xFF2EE66B;
+    private static final String HL_TAG = "crol_hl";
 
     private static class Row {
         int kind;
-        String key;
+        Setting setting;
         String title;
-        String sub;
-        boolean defBool;
-        int defInt;
-        String defStr = "";
-        String[] items;
+        String value;
         String page;
         int action;
         int icon;
+        String arg;
     }
 
     private final String page;
+    private final String highlightKey;
     private final ArrayList<Row> rows = new ArrayList<>();
 
     private RecyclerListView listView;
     private ListAdapter adapter;
+    private LinearLayoutManager layoutManager;
+    private EditTextBoldCursor searchField;
+    private String query = "";
+    private String flashKey;
 
     public CrolGramSettingsActivity() {
-        this("main");
+        this("main", null);
     }
 
     public CrolGramSettingsActivity(String page) {
+        this(page, null);
+    }
+
+    public CrolGramSettingsActivity(String page, String highlightKey) {
         super();
         this.page = page == null ? "main" : page;
+        this.highlightKey = highlightKey;
     }
 
-    // ---------------------------------------------------------------- описание страниц
+    // ---------------------------------------------------------------- построение строк
 
-    private static Row header(String title) {
+    private static Row simple(int kind, String title) {
         Row r = new Row();
-        r.kind = K_HEADER;
+        r.kind = kind;
         r.title = title;
         return r;
     }
 
-    private static Row info(String text) {
+    private static Row settingRow(Setting s) {
         Row r = new Row();
-        r.kind = K_INFO;
-        r.title = text;
+        r.setting = s;
+        r.title = s.title;
+        r.kind = s.type == CrolSettingsRegistry.T_SWITCH ? K_SWITCH
+                : s.type == CrolSettingsRegistry.T_SELECT ? K_SELECT : K_INPUT;
         return r;
     }
 
-    private static Row sw(String key, String title, String sub, boolean def) {
-        Row r = new Row();
-        r.kind = K_SWITCH;
-        r.key = key;
-        r.title = title;
-        r.sub = sub;
-        r.defBool = def;
+    private static Row linkRow(String title, String pageId) {
+        Row r = simple(K_LINK, title);
+        r.page = pageId;
+        CrolSettingsRegistry.Page pg = CrolSettingsRegistry.getPage(pageId);
+        r.icon = pg != null ? pg.icon : R.drawable.msg_info;
         return r;
     }
 
-    private static Row select(String key, String title, int def, String... items) {
-        Row r = new Row();
-        r.kind = K_SELECT;
-        r.key = key;
-        r.title = title;
-        r.defInt = def;
-        r.items = items;
-        return r;
-    }
-
-    private static Row input(String key, String title, String def, String hint) {
-        Row r = new Row();
-        r.kind = K_INPUT;
-        r.key = key;
-        r.title = title;
-        r.defStr = def;
-        r.sub = hint;
-        return r;
-    }
-
-    private static Row link(String title, String page) {
-        Row r = new Row();
-        r.kind = K_LINK;
-        r.title = title;
-        r.page = page;
-        r.icon = iconFor(page);
-        return r;
-    }
-
-    private static Row action(String title, int action) {
-        Row r = new Row();
-        r.kind = K_ACTION;
-        r.title = title;
+    private static Row actionRow(String title, int action) {
+        Row r = simple(K_ACTION, title);
         r.action = action;
         return r;
     }
 
-    private static int iconFor(String page) {
+    private String pageTitle() {
         switch (page) {
-            case "privacy": return R.drawable.msg_secret;
-            case "protect": return R.drawable.msg_block;
-            case "style": return R.drawable.msg_palette;
-            case "grad":
-            case "grad_me":
-            case "grad_others": return R.drawable.msg_customize;
-            case "profile": return R.drawable.msg_openprofile;
-            case "phone": return R.drawable.msg_contacts;
-            case "names": return R.drawable.msg_edit;
-            case "badges": return R.drawable.msg_premium_badge;
-            case "colors": return R.drawable.msg_palette;
-            case "banner": return R.drawable.msg_photo_settings;
-            case "gifts": return R.drawable.msg_gift_premium;
-            case "balance": return R.drawable.msg_filled_datausage;
-            case "tools": return R.drawable.msg_settings_old;
-            case "data": return R.drawable.msg_download;
-            case "debug": return R.drawable.msg_help;
-            default: return R.drawable.msg_info;
-        }
-    }
-
-    private static String[] withExtra(String[] base, String... extra) {
-        String[] out = new String[base.length + extra.length];
-        System.arraycopy(base, 0, out, 0, base.length);
-        System.arraycopy(extra, 0, out, base.length, extra.length);
-        return out;
-    }
-
-    private static String pageTitle(String page) {
-        switch (page) {
-            case "privacy": return "Приватность";
-            case "protect": return "Защита";
-            case "style": return "Стиль";
-            case "grad": return "Градиенты";
-            case "grad_me": return "Мой градиент";
-            case "grad_others": return "Градиент для других";
-            case "profile": return "Профиль";
-            case "phone": return "Номер телефона";
-            case "names": return "Имя и юзернеймы";
-            case "badges": return "Значок и эмодзи";
-            case "colors": return "Цвета профиля";
-            case "banner": return "Баннер";
-            case "gifts": return "Подарки и команды";
-            case "balance": return "Баланс";
-            case "tools": return "Инструменты";
-            case "data": return "Резервная копия";
-            case "debug": return "Отладка";
-            default: return "CrolGram";
+            case "main":
+                return "CrolGram";
+            case "search":
+                return "Поиск";
+            default:
+                return CrolSettingsRegistry.pageTitle(page);
         }
     }
 
     private void buildPage() {
         rows.clear();
-        switch (page) {
-            case "privacy":
-                rows.add(header("Скрытность"));
-                rows.add(sw("hide_typing", "Скрывать «печатает…»", null, false));
-                rows.add(sw("hide_online", "Всегда оффлайн", null, false));
-                rows.add(sw("hide_read", "Не отмечать прочитанным", null, false));
-                rows.add(sw("hide_voice_read", "Не отмечать голосовые и кружки", null, false));
-                rows.add(sw("hide_stories", "Не отмечать просмотр историй", null, false));
-                rows.add(info("Работает на этом устройстве: запросы просто не отправляются на сервер. Все пять пунктов разом включает «Режим призрака»."));
-                break;
-            case "protect":
-                rows.add(header("Сообщения"));
-                rows.add(sw("anti_delete", "Анти-удаление", "Удалённые собеседником сообщения остаются", false));
-                rows.add(sw("deleted_mark", "Пометка удалённых", "Красная пометка «удалено» рядом со временем", true));
-                rows.add(sw("anti_edit", "Анти-изменение", "Старые версии в меню сообщения «История правок»", false));
-                rows.add(sw("no_forward_bypass", "Снять запрет копирования", "Применяется к новым и заново загруженным чатам", false));
-                rows.add(sw("no_ads", "Убрать спонсорские сообщения", null, false));
-                rows.add(sw("ttl_media", "Исчезающие медиа как обычные", "Экспериментально: фото и видео с таймером открываются как обычные", false));
-                rows.add(info("Свои удаления работают как обычно. Остальные сообщения, удалённые собеседником, остаются только у вас."));
-                break;
-            case "style":
-                rows.add(header("Оформление"));
-                rows.add(select("bubble_style", "Стиль пузырей", 0, "Стандартный", "Pixel", "Nothing", "Glass", "Liquid Glass"));
-                rows.add(select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик"));
-                rows.add(header("Ввод текста"));
-                rows.add(sw("anim_typing", "Анимация набора и стирания", "Плавный отклик поля при вводе и удалении текста", true));
-                rows.add(info("Стили пузырей применяются сразу. Форма аватарок меняется в списках и чатах, которые вы откроете заново. " + NOTE_LOCAL));
-                break;
-            case "grad":
-                rows.add(header("Градиенты"));
-                rows.add(sw("gradient_names", "Ники в чатах", null, false));
-                rows.add(link("Мой градиент", "grad_me"));
-                rows.add(link("Градиент для других", "grad_others"));
-                rows.add(sw("grad_replies", "В ответах и пересылках", null, true));
-                rows.add(sw("grad_dialogs", "В списке чатов", null, false));
-                rows.add(sw("grad_profile", "В профиле", null, false));
-                rows.add(sw("grad_title", "В шапке чата", null, false));
-                rows.add(sw("grad_drawer", "В Настройках (моё имя)", "В этой версии Telegram бокового меню нет", false));
-                rows.add(select("grad_text", "Текст сообщений", 0, "Нет", "Мои", "Чужие", "Все"));
-                rows.add(sw("name_glow", "Свечение ников", null, false));
-                rows.add(sw("grad_anim", "Анимация градиента", "Расходует больше батареи", false));
-                rows.add(info("Градиенты применяются сразу. " + NOTE_LOCAL));
-                break;
-            case "grad_me":
-                rows.add(header("Мой градиент"));
-                rows.add(select("grad_me", "Пресет", 13, withExtra(PRESETS, "Свой (HEX)")));
-                rows.add(input("grad_me_custom", "Свои цвета (HEX)", "#FF512F,#F09819,#FF0099", "2–8 цветов через запятую"));
-                rows.add(info("Свои цвета используются при выборе «Свой (HEX)»."));
-                break;
-            case "grad_others":
-                rows.add(header("Градиент для других"));
-                rows.add(select("grad_others", "Пресет", 16, withExtra(PRESETS, "Свой (HEX)", "Разный у каждого")));
-                rows.add(input("grad_others_custom", "Свои цвета (HEX)", "#00C6FF,#0072FF,#7F00FF", "2–8 цветов через запятую"));
-                rows.add(info("Свои цвета используются при выборе «Свой (HEX)»."));
-                break;
-            case "profile":
-                rows.add(header("Мой профиль"));
-                rows.add(link("Номер телефона", "phone"));
-                rows.add(link("Имя, юзернейм и ID", "names"));
-                rows.add(link("Значок и эмодзи-статус", "badges"));
-                rows.add(link("Цвета профиля", "colors"));
-                rows.add(link("Баннер", "banner"));
-                rows.add(header("Показ в профилях"));
-                rows.add(sw("show_id", "Показывать ID и дата-центр", "Одна строка в профиле пользователя: ID, под ним DC", true));
-                rows.add(info(NOTE_LOCAL + " В своём профиле нажмите на ID, телефон или юзернейм, чтобы изменить отображение."));
-                break;
-            case "phone":
-                rows.add(header("Номер телефона"));
-                rows.add(select("phone_mode", "Показывать номер", 0, "Как есть", "Анонимный +888", "Свой текст"));
-                rows.add(input("phone_custom", "Номер или текст", "", "Для +888: до 8 цифр"));
-                rows.add(info(NOTE_LOCAL));
-                break;
-            case "names":
-                rows.add(header("Имя, юзернейм и ID"));
-                rows.add(input("name_custom", "Своё имя", "", "Имя"));
-                rows.add(input("username_custom", "Свой юзернейм", "", "Без @"));
-                rows.add(input("id_custom", "Свой ID", "", "Число"));
-                rows.add(input("usernames_extra", "Дополнительные юзернеймы", "", "Через запятую, без @"));
-                rows.add(info(NOTE_LOCAL + " Дополнительные юзернеймы показываются в строке юзернейма вашего профиля."));
-                break;
-            case "badges":
-                rows.add(header("Значок и эмодзи-статус"));
-                rows.add(select("badge_mode", "Значок", 0, "Нет", "Верификация", "Premium", "Scam", "Fake"));
-                rows.add(input("emoji_status_id", "Эмодзи-статус (ID)", "", "ID эмодзи"));
-                rows.add(input("verif_icon_id", "Иконка верификации (ID эмодзи)", "", "ID эмодзи"));
-                rows.add(input("verif_desc", "Текст верификации", "", "Показывается при нажатии на значок"));
-                rows.add(input("level_custom", "Уровень профиля", "", "Число"));
-                rows.add(info(NOTE_LOCAL + " Значок Premium меняет только отображение, платные функции не включаются."));
-                break;
-            case "colors":
-                rows.add(header("Цвета профиля"));
-                rows.add(input("name_color_id", "Цвет ника (0–20)", "", "Число 0–20"));
-                rows.add(input("profile_color_id", "Цвет фона профиля (0–21)", "", "Число 0–21"));
-                rows.add(input("profile_emoji_id", "Узор профиля (ID эмодзи)", "", "ID эмодзи"));
-                rows.add(info(NOTE_LOCAL));
-                break;
-            case "banner":
-                rows.add(header("Баннер профиля"));
-                rows.add(select("banner_mode", "Тип", 0, "Нет", "Градиент", "Картинка из файла"));
-                rows.add(select("banner_grad", "Градиент", 0, PRESETS));
-                rows.add(input("banner_image", "Путь к картинке", "", "/storage/emulated/0/Download/banner.jpg"));
-                rows.add(info(NOTE_LOCAL + " Баннер рисуется в шапке вашего профиля. Быстрый выбор: долгое нажатие на имя в своём профиле."));
-                break;
-            case "gifts":
-                rows.add(header("Подарки"));
-                rows.add(input("nft_gifts", "NFT-подарки в профиле", "", "Ссылки t.me/nft/..."));
-                rows.add(sw("gifts_pinned", "Закреплять в профиле", null, true));
-                rows.add(link("Баланс", "balance"));
-                rows.add(header("Команды"));
-                rows.add(sw("gift_cmd", "Команды в чате", ".нфт  .грам  .прем3/6/12  .призрак  .ник", false));
-                rows.add(action("Забыть локальные подарки", ACT_FORGET_GIFTS));
-                rows.add(info(NOTE_LOCAL + " Ссылки t.me/nft/... подтягиваются при открытии профиля. Команды в чате на сервер не отправляются."));
-                break;
-            case "balance":
-                rows.add(header("Баланс"));
-                rows.add(input("stars_balance", "Баланс звёзд", "", "Только отображение"));
-                rows.add(input("gram_balance", "Баланс GRAM", "", "Только отображение"));
-                rows.add(info(NOTE_LOCAL + " Меняется только показ баланса, покупки сервер проверяет по настоящему балансу."));
-                break;
-            case "tools":
-                rows.add(header("Инструменты"));
-                rows.add(sw("copy_id", "«Скопировать ID» в меню сообщения", "Копирует ID отправителя", false));
-                rows.add(sw("emoji_pick", "Выбор эмодзи из сообщения", "Пункты «Поставить как эмодзи-статус» и «Как узор профиля» для Premium-эмодзи", false));
-                rows.add(info("«Перевести» уже есть в меню сообщения Telegram."));
-                break;
-            case "data":
-                rows.add(header("Настройки CrolGram"));
-                rows.add(action("Экспорт настроек (в буфер обмена)", ACT_EXPORT));
-                rows.add(action("Импорт настроек (из буфера обмена)", ACT_IMPORT));
-                rows.add(info("Экспорт копирует все настройки в формате JSON. Для импорта скопируйте такой JSON и нажмите «Импорт»."));
-                break;
-            case "debug":
-                rows.add(header("Журнал"));
-                rows.add(action("Скопировать лог", ACT_COPY_LOG));
-                rows.add(action("Очистить лог", ACT_CLEAR_LOG));
-                rows.add(info("В логе счётчики заблокированных запросов и события модулей. В нём нет ваших сообщений и ключей."));
-                break;
-            default:
-                rows.add(header("Режим призрака"));
-                Row g = new Row();
-                g.kind = K_GHOST;
-                g.title = "Режим призрака";
-                g.sub = "Оффлайн, не читать, не «печатает», не слушать, не смотреть истории";
-                rows.add(g);
-                rows.add(info("Включает все пункты раздела «Приватность». Запросы не отправляются на сервер."));
-                rows.add(header("Разделы"));
-                rows.add(link("Приватность", "privacy"));
-                rows.add(link("Защита", "protect"));
-                rows.add(link("Стиль", "style"));
-                rows.add(link("Градиенты", "grad"));
-                rows.add(link("Профиль", "profile"));
-                rows.add(link("Подарки и команды", "gifts"));
-                rows.add(link("Инструменты", "tools"));
-                rows.add(link("Резервная копия", "data"));
-                rows.add(link("Отладка", "debug"));
-                rows.add(info("CrolGram: неофициальный клиент Telegram. Косметические функции меняют только то, что видите вы на этом устройстве."));
-                break;
+        if ("main".equals(page)) {
+            buildMain();
+        } else if ("search".equals(page)) {
+            buildSearch();
+        } else if ("profiles".equals(page)) {
+            buildProfiles();
+        } else {
+            buildFromRegistry();
         }
+    }
+
+    private void buildMain() {
+        rows.add(simple(K_CARD, null));
+        rows.add(simple(K_HEADER, "Быстрые переключатели"));
+        rows.add(simple(K_TILES, null));
+        Row s = linkRow("Поиск по настройкам", "search");
+        s.icon = R.drawable.msg_search;
+        rows.add(s);
+        rows.add(simple(K_HEADER, "Избранное"));
+        ArrayList<String> favs = CrolSettingsRegistry.favorites();
+        if (favs.isEmpty()) {
+            rows.add(simple(K_INFO, "Удерживайте любой пункт настроек, чтобы закрепить его здесь."));
+        } else {
+            for (String k : favs) {
+                Setting st = CrolSettingsRegistry.getSetting(k);
+                if (st != null) {
+                    rows.add(settingRow(st));
+                }
+            }
+            rows.add(simple(K_INFO, "Удерживайте пункт, чтобы убрать его из избранного."));
+        }
+        rows.add(simple(K_HEADER, "Разделы"));
+        for (String id : CrolSettingsRegistry.MAIN_SECTIONS) {
+            CrolSettingsRegistry.Page pg = CrolSettingsRegistry.getPage(id);
+            if (pg == null) {
+                continue;
+            }
+            Row r = simple(K_SECTION, pg.title);
+            r.page = id;
+            r.icon = pg.icon;
+            r.value = CrolSettingsRegistry.status(id);
+            rows.add(r);
+        }
+        rows.add(simple(K_INFO, "CrolGram: неофициальный клиент Telegram. Косметические функции меняют только то, что видите вы на этом устройстве."));
+    }
+
+    private void buildSearch() {
+        rows.clear();
+        rows.add(simple(K_SEARCH, null));
+        appendSearchResults();
+    }
+
+    private void appendSearchResults() {
+        String q = query == null ? "" : query.trim();
+        if (q.isEmpty()) {
+            rows.add(simple(K_INFO, "Введите название настройки или слово из описания, например «градиент», «призрак» или «аватар»."));
+            return;
+        }
+        ArrayList<Setting> found = CrolSettingsRegistry.search(q);
+        if (found.isEmpty()) {
+            rows.add(simple(K_INFO, "Ничего не найдено."));
+            return;
+        }
+        rows.add(simple(K_HEADER, "Найдено: " + found.size()));
+        for (Setting s : found) {
+            Row r = simple(K_RESULT, s.title);
+            r.setting = s;
+            r.value = CrolSettingsRegistry.pageTitle(s.page);
+            CrolSettingsRegistry.Page pg = CrolSettingsRegistry.getPage(s.page);
+            r.icon = pg != null ? pg.icon : R.drawable.msg_info;
+            rows.add(r);
+        }
+    }
+
+    private void buildFromRegistry() {
+        CrolSettingsRegistry.Page pg = CrolSettingsRegistry.getPage(page);
+        if (pg == null) {
+            rows.add(simple(K_INFO, "Страница не найдена."));
+            return;
+        }
+        boolean hasSettings = false;
+        for (Entry e : pg.entries) {
+            switch (e.kind) {
+                case CrolSettingsRegistry.E_HEADER:
+                    rows.add(simple(K_HEADER, e.title));
+                    break;
+                case CrolSettingsRegistry.E_INFO:
+                    rows.add(simple(K_INFO, e.title));
+                    break;
+                case CrolSettingsRegistry.E_GHOST: {
+                    Row g = simple(K_GHOST, "Режим призрака");
+                    rows.add(g);
+                    break;
+                }
+                case CrolSettingsRegistry.E_LINK:
+                    rows.add(linkRow(e.title, e.page));
+                    break;
+                case CrolSettingsRegistry.E_ACTION:
+                    rows.add(actionRow(e.title, e.action));
+                    break;
+                case CrolSettingsRegistry.E_SETTING:
+                    rows.add(settingRow(e.setting));
+                    hasSettings = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (hasSettings || "privacy".equals(page)) {
+            rows.add(simple(K_HEADER, "Сброс"));
+            rows.add(actionRow("Сбросить раздел", ACT_RESET_PAGE));
+            rows.add(simple(K_INFO, "Вернёт настройки этого раздела к значениям по умолчанию."));
+        }
+    }
+
+    private void buildProfiles() {
+        String active = CrolConfig.getString("active_profile", "");
+        rows.add(simple(K_HEADER, "Встроенные"));
+        for (String n : CrolPresets.BUILTIN) {
+            Row r = simple(K_BUILTIN, n);
+            r.value = n.equals(active) ? "активен" : "";
+            r.icon = R.drawable.msg_theme;
+            rows.add(r);
+        }
+        ArrayList<String> saved = CrolPresets.savedNames();
+        rows.add(simple(K_HEADER, "Мои профили"));
+        if (saved.isEmpty()) {
+            rows.add(simple(K_INFO, "Пока нет сохранённых профилей."));
+        } else {
+            for (String n : saved) {
+                Row r = simple(K_SAVED, n);
+                r.value = n.equals(active) ? "активен" : "";
+                r.icon = R.drawable.msg_saved;
+                rows.add(r);
+            }
+        }
+        rows.add(simple(K_HEADER, "Действия"));
+        rows.add(actionRow("Сохранить текущее оформление как профиль", CrolSettingsRegistry.ACT_SAVE_PROFILE));
+        rows.add(actionRow("Импорт профиля (из буфера обмена)", CrolSettingsRegistry.ACT_IMPORT_PROFILE));
+        rows.add(simple(K_INFO, "В профиль входят стиль пузырей, форма аватарок, градиенты, баннер и анимация ввода. "
+                + CrolSettingsRegistry.NOTE_LOCAL));
     }
 
     // ---------------------------------------------------------------- жизненный цикл
@@ -380,7 +319,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
         buildPage();
         setHasOwnBackground(true);
         simpleActionBar.setBackButtonImage(R.drawable.ic_ab_back);
-        simpleActionBar.setTitle(pageTitle(page));
+        simpleActionBar.setTitle(pageTitle());
         simpleActionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -396,26 +335,65 @@ public class CrolGramSettingsActivity extends BaseFragment {
         listView = new RecyclerListView(context);
         listView.setSectionsDrawBackground(true);
         listView.setSections();
-        listView.setLayoutManager(new LinearLayoutManager(context));
+        layoutManager = new LinearLayoutManager(context);
+        listView.setLayoutManager(layoutManager);
         listView.setVerticalScrollBarEnabled(false);
         listView.setAdapter(adapter = new ListAdapter(context));
         listView.setOnItemClickListener((view, position) -> onRowClicked(position));
+        listView.setOnItemLongClickListener((view, position) -> onRowLongClicked(position));
         frameLayout.addView(listView, LayoutHelper.createFrame(
                 LayoutHelper.MATCH_PARENT,
                 LayoutHelper.MATCH_PARENT
         ));
+
+        if (highlightKey != null) {
+            flashKey = highlightKey;
+            listView.post(() -> {
+                for (int i = 0; i < rows.size(); i++) {
+                    Row r = rows.get(i);
+                    if (r.setting != null && highlightKey.equals(r.setting.key)) {
+                        layoutManager.scrollToPositionWithOffset(i, AndroidUtilities.dp(120));
+                        adapter.notifyItemChanged(i);
+                        break;
+                    }
+                }
+            });
+            AndroidUtilities.runOnUIThread(() -> {
+                flashKey = null;
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
+            }, 1800);
+        }
         return fragmentView;
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (adapter != null) {
+        if (!"search".equals(page) && adapter != null) {
+            buildPage();
             adapter.notifyDataSetChanged();
         }
     }
 
     // ---------------------------------------------------------------- действия
+
+    private boolean isDisabled(Row r) {
+        if (r.setting == null || r.setting.dependsOn == null) {
+            return false;
+        }
+        Setting dep = CrolSettingsRegistry.getSetting(r.setting.dependsOn);
+        return dep != null && !CrolConfig.getRawBool(dep.key, dep.defBool);
+    }
+
+    private void refreshRows() {
+        if (adapter == null) {
+            return;
+        }
+        buildPage();
+        adapter.notifyDataSetChanged();
+    }
 
     private void onRowClicked(int position) {
         if (position < 0 || position >= rows.size()) {
@@ -428,40 +406,77 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 adapter.notifyDataSetChanged();
                 break;
             case K_SWITCH:
-                CrolConfig.setBool(r.key, !CrolConfig.getBool(r.key, r.defBool));
-                adapter.notifyDataSetChanged();
-                break;
             case K_SELECT:
-                showSelect(r);
-                break;
             case K_INPUT:
-                showInput(r);
+                if (isDisabled(r)) {
+                    Setting dep = CrolSettingsRegistry.getSetting(r.setting.dependsOn);
+                    toast("Сначала включите: " + (dep != null ? dep.title : ""));
+                    break;
+                }
+                if (r.kind == K_SWITCH) {
+                    CrolConfig.setBool(r.setting.key, !CrolConfig.getRawBool(r.setting.key, r.setting.defBool));
+                    refreshRows();
+                } else if (r.kind == K_SELECT) {
+                    showSelect(r);
+                } else {
+                    showInput(r);
+                }
+                break;
+            case K_RESULT:
+                presentFragment(new CrolGramSettingsActivity(r.setting.page, r.setting.key));
                 break;
             case K_LINK:
+            case K_SECTION:
                 presentFragment(new CrolGramSettingsActivity(r.page));
                 break;
             case K_ACTION:
-                runAction(r.action);
+                runAction(r.action, r.arg);
+                break;
+            case K_BUILTIN:
+                if (CrolPresets.applyBuiltin(r.title)) {
+                    toast("Применён профиль «" + r.title + "»");
+                }
+                refreshRows();
+                break;
+            case K_SAVED:
+                showSavedMenu(r.title);
                 break;
             default:
                 break;
         }
     }
 
+    private boolean onRowLongClicked(int position) {
+        if (position < 0 || position >= rows.size()) {
+            return false;
+        }
+        Row r = rows.get(position);
+        if (r.setting == null) {
+            return false;
+        }
+        boolean now = CrolSettingsRegistry.toggleFavorite(r.setting.key);
+        toast(now ? "Добавлено в избранное" : "Убрано из избранного");
+        if ("main".equals(page)) {
+            refreshRows();
+        }
+        return true;
+    }
+
     private void showSelect(Row r) {
         if (getParentActivity() == null) {
             return;
         }
+        final Setting s = r.setting;
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(r.title);
-        final CharSequence[] labels = new CharSequence[r.items.length];
+        builder.setTitle(s.title);
+        final CharSequence[] labels = new CharSequence[s.items.length];
         for (int i = 0; i < labels.length; i++) {
-            labels[i] = r.items[i];
+            labels[i] = s.items[i];
         }
         builder.setItems(labels, (dialog, index) -> {
-            CrolConfig.setInt(r.key, index);
+            CrolConfig.setInt(s.key, index);
             org.telegram.messenger.CrolProfile.refreshSelf();
-            adapter.notifyDataSetChanged();
+            refreshRows();
         });
         showDialog(builder.create());
     }
@@ -470,23 +485,60 @@ public class CrolGramSettingsActivity extends BaseFragment {
         if (getParentActivity() == null) {
             return;
         }
-        boolean numeric = "id_custom".equals(r.key) || "name_color_id".equals(r.key) || "profile_color_id".equals(r.key)
-                || "profile_emoji_id".equals(r.key) || "emoji_status_id".equals(r.key);
-        CrolEditDialog.show(this, r.title, r.sub, CrolConfig.getString(r.key, r.defStr),
-                numeric ? InputType.TYPE_CLASS_NUMBER : InputType.TYPE_CLASS_TEXT,
+        final Setting s = r.setting;
+        CrolEditDialog.show(this, s.title, s.sub, CrolConfig.getString(s.key, s.defStr),
+                s.numeric ? InputType.TYPE_CLASS_NUMBER : InputType.TYPE_CLASS_TEXT,
                 new CrolEditDialog.Handler() {
                     @Override
                     public void onSave(String value) {
-                        CrolConfig.setString(r.key, value);
-                        adapter.notifyDataSetChanged();
+                        CrolConfig.setString(s.key, value);
+                        refreshRows();
                     }
 
                     @Override
                     public void onReset() {
-                        CrolConfig.remove(r.key);
-                        adapter.notifyDataSetChanged();
+                        CrolConfig.remove(s.key);
+                        refreshRows();
                     }
                 });
+    }
+
+    private void showSavedMenu(final String name) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(name);
+        builder.setItems(new CharSequence[]{"Применить", "Экспорт в буфер обмена", "Удалить"}, (dialog, index) -> {
+            if (index == 0) {
+                if (CrolPresets.applySaved(name)) {
+                    toast("Применён профиль «" + name + "»");
+                }
+            } else if (index == 1) {
+                String json = CrolPresets.exportSaved(name);
+                if (json != null) {
+                    AndroidUtilities.addToClipboard(json);
+                    toast("Профиль скопирован");
+                }
+            } else {
+                CrolPresets.deleteSaved(name);
+                toast("Профиль удалён");
+            }
+            refreshRows();
+        });
+        showDialog(builder.create());
+    }
+
+    private void confirm(String title, String message, Runnable onYes) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(title);
+        builder.setMessage(message);
+        builder.setPositiveButton("Сбросить", (d, w) -> onYes.run());
+        builder.setNegativeButton("Отмена", null);
+        showDialog(builder.create());
     }
 
     private void toast(String text) {
@@ -495,26 +547,30 @@ public class CrolGramSettingsActivity extends BaseFragment {
         }
     }
 
-    private void runAction(int action) {
+    private void runAction(int action, String arg) {
         switch (action) {
-            case ACT_EXPORT:
+            case ACT_RESET_PAGE:
+                confirm("Сбросить раздел?", "Настройки раздела «" + pageTitle() + "» вернутся к значениям по умолчанию.", () -> {
+                    int n = CrolSettingsRegistry.resetPage(page);
+                    org.telegram.messenger.CrolProfile.refreshSelf();
+                    toast("Сброшено настроек: " + n);
+                    refreshRows();
+                });
+                break;
+            case CrolSettingsRegistry.ACT_RESET_ALL:
+                confirm("Сбросить всё?", "Все настройки CrolGram вернутся к значениям по умолчанию. Профили оформления сохранятся.", () -> {
+                    CrolSettingsRegistry.resetAll();
+                    org.telegram.messenger.CrolProfile.refreshSelf();
+                    toast("Настройки сброшены");
+                    refreshRows();
+                });
+                break;
+            case CrolSettingsRegistry.ACT_EXPORT:
                 AndroidUtilities.addToClipboard(CrolConfig.exportJson());
                 toast("Настройки скопированы");
                 break;
-            case ACT_IMPORT: {
-                Context context = getParentActivity();
-                if (context == null) {
-                    return;
-                }
-                String text = null;
-                try {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-                    if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
-                        CharSequence cs = cm.getPrimaryClip().getItemAt(0).coerceToText(context);
-                        text = cs == null ? null : cs.toString();
-                    }
-                } catch (Throwable ignore) {
-                }
+            case CrolSettingsRegistry.ACT_IMPORT: {
+                String text = readClipboard();
                 if (text == null || text.trim().isEmpty()) {
                     toast("В буфере обмена пусто");
                     return;
@@ -523,29 +579,234 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 if (n < 0) {
                     toast("Не удалось разобрать JSON");
                 } else {
+                    org.telegram.messenger.CrolProfile.refreshSelf();
                     toast("Импортировано значений: " + n);
-                    adapter.notifyDataSetChanged();
+                    refreshRows();
                 }
                 break;
             }
-            case ACT_COPY_LOG:
-                AndroidUtilities.addToClipboard(CrolConfig.dumpLog());
+            case CrolSettingsRegistry.ACT_COPY_LOG:
+                AndroidUtilities.addToClipboard("CrolGram " + BuildVars.BUILD_VERSION_STRING + "\n" + CrolConfig.dumpLog());
                 toast("Лог скопирован");
                 break;
-            case ACT_CLEAR_LOG:
+            case CrolSettingsRegistry.ACT_CLEAR_LOG:
                 CrolConfig.clearLog();
                 toast("Лог очищен");
                 break;
-            case ACT_FORGET_GIFTS:
+            case CrolSettingsRegistry.ACT_FORGET_GIFTS:
                 org.telegram.messenger.CrolGifts.forgetLocal();
                 toast("Локальные подарки забыты");
-                if (adapter != null) {
-                    adapter.notifyDataSetChanged();
-                }
+                refreshRows();
                 break;
+            case CrolSettingsRegistry.ACT_SAVE_PROFILE:
+                CrolEditDialog.show(this, "Сохранить как профиль", "Название профиля", "", InputType.TYPE_CLASS_TEXT,
+                        new CrolEditDialog.Handler() {
+                            @Override
+                            public void onSave(String value) {
+                                if (CrolPresets.saveCurrent(value)) {
+                                    toast("Профиль сохранён");
+                                } else {
+                                    toast("Введите название до 40 символов");
+                                }
+                                refreshRows();
+                            }
+
+                            @Override
+                            public void onReset() {
+                            }
+                        });
+                break;
+            case CrolSettingsRegistry.ACT_IMPORT_PROFILE: {
+                String text = readClipboard();
+                if (text == null || text.trim().isEmpty()) {
+                    toast("В буфере обмена пусто");
+                    return;
+                }
+                String name = CrolPresets.importProfile(text);
+                toast(name == null ? "Не удалось разобрать профиль" : "Импортирован профиль «" + name + "»");
+                refreshRows();
+                break;
+            }
             default:
                 break;
         }
+    }
+
+    private String readClipboard() {
+        Context context = getParentActivity();
+        if (context == null) {
+            return null;
+        }
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence cs = cm.getPrimaryClip().getItemAt(0).coerceToText(context);
+                return cs == null ? null : cs.toString();
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
+
+    // ---------------------------------------------------------------- вспомогательные виды
+
+    private View createCard(Context context) {
+        LinearLayout box = new LinearLayout(context);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(20), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
+
+        TextView logo = new TextView(context);
+        logo.setText("C");
+        logo.setGravity(Gravity.CENTER);
+        logo.setTypeface(Typeface.DEFAULT_BOLD);
+        logo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 34);
+        logo.setTextColor(Color.WHITE);
+        logo.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(18), 0xFF0A9E4B));
+        box.addView(logo, LayoutHelper.createLinear(68, 68, Gravity.CENTER_HORIZONTAL));
+
+        TextView name = new TextView(context);
+        name.setText("CrolGram");
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
+        name.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        box.addView(name, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 10, 0, 0));
+
+        TextView ver = new TextView(context);
+        ver.setText("Версия " + BuildVars.BUILD_VERSION_STRING);
+        ver.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        ver.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        box.addView(ver, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 2, 0, 0));
+
+        TextView btn = new TextView(context);
+        btn.setText("Сообщить об ошибке");
+        btn.setGravity(Gravity.CENTER);
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        btn.setTypeface(Typeface.DEFAULT_BOLD);
+        btn.setTextColor(Color.WHITE);
+        btn.setPadding(AndroidUtilities.dp(18), 0, AndroidUtilities.dp(18), 0);
+        btn.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(18), 0xFF0A9E4B));
+        btn.setOnClickListener(v -> runAction(CrolSettingsRegistry.ACT_COPY_LOG, null));
+        box.addView(btn, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 36, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 0));
+        return box;
+    }
+
+    private boolean tileState(int i) {
+        switch (i) {
+            case 0:
+                return CrolConfig.isGhost();
+            case 1:
+                return CrolConfig.getRawBool("anti_delete", false);
+            case 2:
+                return CrolConfig.getRawBool("plain_mode", false);
+            default:
+                return CrolConfig.getRawBool("quiet_on", false);
+        }
+    }
+
+    private void tileToggle(int i) {
+        switch (i) {
+            case 0:
+                CrolConfig.setGhost(!CrolConfig.isGhost());
+                break;
+            case 1:
+                CrolConfig.setBool("anti_delete", !CrolConfig.getRawBool("anti_delete", false));
+                break;
+            case 2:
+                CrolConfig.setBool("plain_mode", !CrolConfig.getRawBool("plain_mode", false));
+                break;
+            default:
+                CrolConfig.setBool("quiet_on", !CrolConfig.getRawBool("quiet_on", false));
+                break;
+        }
+    }
+
+    private LinearLayout createTiles(Context context) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(4), AndroidUtilities.dp(12), AndroidUtilities.dp(12));
+        final String[] labels = {"Призрак", "Анти-удаление", "Как Telegram", "Тихие часы"};
+        final int[] icons = {R.drawable.msg_secret, R.drawable.msg_delete, R.drawable.msg_theme, R.drawable.msg_mute};
+        for (int i = 0; i < 4; i++) {
+            final int index = i;
+            LinearLayout tile = new LinearLayout(context);
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setGravity(Gravity.CENTER);
+            tile.setPadding(AndroidUtilities.dp(4), AndroidUtilities.dp(10), AndroidUtilities.dp(4), AndroidUtilities.dp(10));
+            ImageView icon = new ImageView(context);
+            icon.setImageResource(icons[i]);
+            icon.setScaleType(ImageView.ScaleType.CENTER);
+            tile.addView(icon, LayoutHelper.createLinear(28, 28, Gravity.CENTER_HORIZONTAL));
+            TextView label = new TextView(context);
+            label.setText(labels[i]);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            label.setGravity(Gravity.CENTER);
+            label.setSingleLine(true);
+            label.setEllipsize(TextUtils.TruncateAt.END);
+            tile.addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 0));
+            styleTile(tile, icon, label, tileState(i));
+            tile.setOnClickListener(v -> {
+                tileToggle(index);
+                boolean on = tileState(index);
+                styleTile(tile, icon, label, on);
+                toast(labels[index] + (on ? ": включено" : ": выключено"));
+            });
+            row.addView(tile, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, i == 0 ? 0 : 8, 0, 0, 0));
+        }
+        return row;
+    }
+
+    private void styleTile(View tile, ImageView icon, TextView label, boolean on) {
+        tile.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(14),
+                on ? Theme.multAlpha(ACCENT, 0.28f) : Theme.getColor(Theme.key_windowBackgroundGray)));
+        int c = on ? ACCENT : Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon);
+        icon.setColorFilter(new PorterDuffColorFilter(c, PorterDuff.Mode.MULTIPLY));
+        label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+    }
+
+    private View createSearchField(Context context) {
+        FrameLayout box = new FrameLayout(context);
+        box.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(8), AndroidUtilities.dp(20), AndroidUtilities.dp(8));
+        searchField = CrolEditDialog.createField(context, "Поиск по настройкам", query, InputType.TYPE_CLASS_TEXT);
+        searchField.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String now = s == null ? "" : s.toString();
+                if (now.equals(query)) {
+                    return;
+                }
+                query = now;
+                int old = rows.size();
+                while (rows.size() > 1) {
+                    rows.remove(rows.size() - 1);
+                }
+                appendSearchResults();
+                if (adapter != null) {
+                    if (old > 1) {
+                        adapter.notifyItemRangeRemoved(1, old - 1);
+                    }
+                    if (rows.size() > 1) {
+                        adapter.notifyItemRangeInserted(1, rows.size() - 1);
+                    }
+                }
+            }
+        });
+        box.addView(searchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        AndroidUtilities.runOnUIThread(() -> {
+            if (searchField != null) {
+                searchField.requestFocus();
+                AndroidUtilities.showKeyboard(searchField);
+            }
+        }, 250);
+        return box;
     }
 
     // ---------------------------------------------------------------- адаптер
@@ -565,7 +826,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
             int type = holder.getItemViewType();
-            return type == TYPE_CHECK || type == TYPE_VALUE || type == TYPE_ICON;
+            return type == TYPE_CHECK || type == TYPE_VALUE || type == TYPE_ICON || type == TYPE_ICON_VALUE;
         }
 
         @NonNull
@@ -576,12 +837,18 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 view = new HeaderCell(context);
             } else if (viewType == TYPE_CHECK) {
                 view = new TextCheckCell(context);
-            } else if (viewType == TYPE_ICON) {
+            } else if (viewType == TYPE_ICON || viewType == TYPE_ICON_VALUE) {
                 view = new TextCell(context);
             } else if (viewType == TYPE_VALUE) {
                 TextSettingsCell cell = new TextSettingsCell(context);
                 cell.setCanDisable(true);
                 view = cell;
+            } else if (viewType == TYPE_CARD) {
+                view = createCard(context);
+            } else if (viewType == TYPE_TILES) {
+                view = createTiles(context);
+            } else if (viewType == TYPE_SEARCH) {
+                view = createSearchField(context);
             } else {
                 view = new TextInfoPrivacyCell(context);
             }
@@ -600,33 +867,69 @@ public class CrolGramSettingsActivity extends BaseFragment {
             return next != K_INFO && next != K_HEADER;
         }
 
+        private String switchSub(Setting s) {
+            StringBuilder sb = new StringBuilder();
+            if (s.sub != null) {
+                sb.append(s.sub);
+            }
+            if (s.experimental) {
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append("Экспериментально");
+            }
+            if (s.localOnly) {
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append(CrolSettingsRegistry.MARK_LOCAL);
+            }
+            return sb.length() == 0 ? null : sb.toString();
+        }
+
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             Row r = rows.get(position);
             int type = holder.getItemViewType();
             boolean divider = hasDivider(position);
+            boolean disabled = isDisabled(r);
+            holder.itemView.setAlpha(disabled ? 0.5f : 1f);
+            if (holder.itemView.getTag() != null && HL_TAG.equals(holder.itemView.getTag())) {
+                holder.itemView.setBackground(null);
+                holder.itemView.setTag(null);
+            }
+            if (flashKey != null && r.setting != null && flashKey.equals(r.setting.key)) {
+                holder.itemView.setBackgroundColor(Theme.multAlpha(ACCENT, 0.22f));
+                holder.itemView.setTag(HL_TAG);
+            }
             if (type == TYPE_HEADER) {
                 ((HeaderCell) holder.itemView).setText(r.title);
             } else if (type == TYPE_CHECK) {
                 TextCheckCell cell = (TextCheckCell) holder.itemView;
-                boolean checked = r.kind == K_GHOST ? CrolConfig.isGhost() : CrolConfig.getBool(r.key, r.defBool);
-                if (r.sub != null) {
-                    cell.setTextAndValueAndCheck(r.title, r.sub, checked, true, divider);
+                boolean checked = r.kind == K_GHOST ? CrolConfig.isGhost() : CrolConfig.getRawBool(r.setting.key, r.setting.defBool);
+                String sub = r.kind == K_GHOST
+                        ? "Оффлайн, не читать, не «печатает», не слушать, не смотреть истории"
+                        : switchSub(r.setting);
+                if (sub != null) {
+                    cell.setTextAndValueAndCheck(r.title, sub, checked, true, divider);
                 } else {
                     cell.setTextAndCheck(r.title, checked, divider);
                 }
             } else if (type == TYPE_ICON) {
                 ((TextCell) holder.itemView).setTextAndIcon(r.title, r.icon, divider);
+            } else if (type == TYPE_ICON_VALUE) {
+                ((TextCell) holder.itemView).setTextAndValueAndIcon(r.title, r.value == null ? "" : r.value, r.icon, divider);
             } else if (type == TYPE_VALUE) {
                 TextSettingsCell cell = (TextSettingsCell) holder.itemView;
                 if (r.kind == K_SELECT) {
-                    int idx = CrolConfig.getInt(r.key, r.defInt);
-                    if (idx < 0 || idx >= r.items.length) {
-                        idx = Math.max(0, Math.min(r.defInt, r.items.length - 1));
+                    Setting s = r.setting;
+                    int idx = CrolConfig.getRawInt(s.key, s.defInt);
+                    if (idx < 0 || idx >= s.items.length) {
+                        idx = Math.max(0, Math.min(s.defInt, s.items.length - 1));
                     }
-                    cell.setTextAndValue(r.title, r.items[idx], divider);
+                    cell.setTextAndValue(r.title, s.items[idx], divider);
                 } else if (r.kind == K_INPUT) {
-                    String value = CrolConfig.getString(r.key, r.defStr);
+                    String value = CrolConfig.getString(r.setting.key, r.setting.defStr);
                     if (value == null || value.isEmpty()) {
                         value = "не задано";
                     }
@@ -634,26 +937,46 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 } else {
                     cell.setText(r.title, divider);
                 }
-            } else {
+            } else if (type == TYPE_INFO) {
                 ((TextInfoPrivacyCell) holder.itemView).setText(r.title);
+            } else if (type == TYPE_TILES) {
+                LinearLayout row = (LinearLayout) holder.itemView;
+                for (int i = 0; i < row.getChildCount() && i < 4; i++) {
+                    View tile = row.getChildAt(i);
+                    if (tile instanceof LinearLayout && ((LinearLayout) tile).getChildCount() >= 2) {
+                        LinearLayout t = (LinearLayout) tile;
+                        styleTile(t, (ImageView) t.getChildAt(0), (TextView) t.getChildAt(1), tileState(i));
+                    }
+                }
             }
         }
 
         @Override
         public int getItemViewType(int position) {
-            int kind = rows.get(position).kind;
-            switch (kind) {
+            Row r = rows.get(position);
+            switch (r.kind) {
                 case K_HEADER:
                     return TYPE_HEADER;
                 case K_SWITCH:
                 case K_GHOST:
                     return TYPE_CHECK;
                 case K_SELECT:
-                case K_LINK:
-                    return TYPE_ICON;
                 case K_INPUT:
                 case K_ACTION:
                     return TYPE_VALUE;
+                case K_LINK:
+                    return TYPE_ICON;
+                case K_SECTION:
+                case K_RESULT:
+                case K_BUILTIN:
+                case K_SAVED:
+                    return TYPE_ICON_VALUE;
+                case K_CARD:
+                    return TYPE_CARD;
+                case K_TILES:
+                    return TYPE_TILES;
+                case K_SEARCH:
+                    return TYPE_SEARCH;
                 default:
                     return TYPE_INFO;
             }
