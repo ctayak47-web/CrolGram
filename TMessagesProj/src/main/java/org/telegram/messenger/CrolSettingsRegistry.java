@@ -20,6 +20,7 @@ public class CrolSettingsRegistry {
     public static final int E_INFO = 3;
     public static final int E_ACTION = 4;
     public static final int E_GHOST = 5;
+    public static final int E_PREVIEW = 6;
 
     public static final int ACT_EXPORT = 1;
     public static final int ACT_IMPORT = 2;
@@ -31,6 +32,10 @@ public class CrolSettingsRegistry {
     public static final int ACT_IMPORT_PROFILE = 8;
     public static final int ACT_APPLY_PROFILE = 9;
     public static final int ACT_OPEN_PROFILE = 10;
+    public static final int ACT_AUTO_THEME = 12;
+    public static final int ACT_WALLPAPERS = 13;
+    public static final int ACT_BACKUP_NOW = 14;
+    public static final int ACT_RESTORE_BACKUP = 15;
 
     public static final String NOTE_LOCAL = "Только на этом устройстве: другие люди и серверы Telegram ничего не увидят.";
     public static final String MARK_LOCAL = "Только на этом устройстве";
@@ -105,6 +110,12 @@ public class CrolSettingsRegistry {
             entries.add(e);
         }
 
+        public void preview() {
+            Entry e = new Entry();
+            e.kind = E_PREVIEW;
+            entries.add(e);
+        }
+
         public void ghost() {
             Entry e = new Entry();
             e.kind = E_GHOST;
@@ -169,7 +180,7 @@ public class CrolSettingsRegistry {
 
     /** Порядок разделов на главной странице. */
     public static final String[] MAIN_SECTIONS = {
-            "look", "chat", "profile", "privacy", "auto", "tools", "backup", "about"
+            "look", "dialogs", "chat", "profile", "privacy", "auto", "tools", "backup", "about"
     };
 
     private static Page page(String id, String title, int icon) {
@@ -194,6 +205,7 @@ public class CrolSettingsRegistry {
 
         // ------------------------------------------------ Внешний вид
         p = page("look", "Внешний вид", R.drawable.msg_palette);
+        p.preview();
         p.header("Режим");
         p.sw("plain_mode", "Почти как Telegram", "Отключает украшения (пузыри, аватарки, градиенты). Настройки не теряются", false)
                 .kw("обычный стандартный отключить украшения plain classic").local();
@@ -202,6 +214,12 @@ public class CrolSettingsRegistry {
                 .kw("пузыри сообщения bubble стекло nothing pixel").local();
         p.select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик")
                 .kw("аватар фото форма круг квадрат avatar").local();
+        p.header("Шрифт");
+        p.sw("dot_font", "Точечный шрифт", "Время и счётчики в списке чатов шрифтом Doto (лицензия OFL)", false)
+                .kw("шрифт точки nothing doto матричный dot font").local();
+        p.header("Встроенные возможности Telegram");
+        p.action("Автотема по времени суток", ACT_AUTO_THEME);
+        p.action("Обои чата, в том числе анимированные", ACT_WALLPAPERS);
         p.header("Разделы");
         p.link("Градиенты", "grad");
         p.link("Профили оформления", "profiles");
@@ -209,6 +227,7 @@ public class CrolSettingsRegistry {
 
         // ------------------------------------------------ Градиенты
         p = page("grad", "Градиенты", R.drawable.msg_customize);
+        p.preview();
         p.header("Где показывать");
         p.sw("gradient_names", "Ники в чатах", null, false).kw("цвет ник имя градиент").local();
         p.link("Мой градиент", "grad_me");
@@ -225,12 +244,14 @@ public class CrolSettingsRegistry {
         p.info("Градиенты применяются сразу. " + NOTE_LOCAL);
 
         p = page("grad_me", "Мой градиент", R.drawable.msg_customize);
+        p.preview();
         p.header("Мой градиент");
         p.select("grad_me", "Пресет", 13, withExtra(presets, "Свой (HEX)")).kw("пресет кислота градиент мой").local();
         p.input("grad_me_custom", "Свои цвета (HEX)", "#FF512F,#F09819,#FF0099", "2–8 цветов через запятую").kw("hex цвет свой").local();
         p.info("Свои цвета используются при выборе «Свой (HEX)».");
 
         p = page("grad_others", "Градиент для других", R.drawable.msg_customize);
+        p.preview();
         p.header("Градиент для других");
         p.select("grad_others", "Пресет", 16, withExtra(presets, "Свой (HEX)", "Разный у каждого")).kw("пресет чужие собеседник градиент").local();
         p.input("grad_others_custom", "Свои цвета (HEX)", "#00C6FF,#0072FF,#7F00FF", "2–8 цветов через запятую").kw("hex цвет свой").local();
@@ -241,7 +262,16 @@ public class CrolSettingsRegistry {
         p.header("Поле ввода");
         p.sw("anim_typing", "Анимация набора и стирания", "Плавный отклик поля при вводе и удалении текста", true)
                 .kw("ввод анимация набор клавиатура").local();
+        p.header("Шапка и поле ввода");
+        p.sw("glass_chat", "Стеклянные шапка и поле ввода", "Размытие фона под шапкой и полем ввода. Встроенная функция Telegram: работает на Android 12+ и не в режиме экономии", false)
+                .kw("стекло размытие blur прозрачная шапка glass liquid").local();
         p.info("Остальные настройки чата появятся в следующих обновлениях. " + NOTE_LOCAL);
+
+        p = page("dialogs", "Список чатов", R.drawable.msg_message);
+        p.header("Плотность");
+        p.select("dialog_lines", "Строки в списке чатов", 0, "Две строки (компактно)", "Три строки (просторно)")
+                .kw("плотность список чатов строки компактный просторный density").local();
+        p.info("Включает встроенный трёхстрочный вид Telegram: больше текста сообщения в списке. " + NOTE_LOCAL);
 
         // ------------------------------------------------ Профиль
         p = page("profile", "Профиль", R.drawable.msg_openprofile);
@@ -350,6 +380,11 @@ public class CrolSettingsRegistry {
         p = page("backup", "Резервные копии", R.drawable.msg_download);
         p.header("Профили оформления");
         p.link("Профили оформления", "profiles");
+        p.header("Автоматическая копия");
+        p.sw("auto_backup", "Копия раз в сутки", "Файл crolgram_backup.json в папке приложения: Android/data/com.crollow.crolgram/files", false)
+                .kw("резервная копия автобэкап сохранить бэкап backup");
+        p.action("Сделать копию сейчас", ACT_BACKUP_NOW);
+        p.action("Восстановить из последней копии", ACT_RESTORE_BACKUP);
         p.header("Настройки CrolGram");
         p.action("Экспорт настроек (в буфер обмена)", ACT_EXPORT);
         p.action("Импорт настроек (из буфера обмена)", ACT_IMPORT);

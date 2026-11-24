@@ -61,6 +61,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int TYPE_TILES = 6;
     private static final int TYPE_SEARCH = 7;
     private static final int TYPE_ICON_VALUE = 8;
+    private static final int TYPE_PREVIEW = 9;
 
     private static final int K_HEADER = 0;
     private static final int K_SWITCH = 1;
@@ -77,6 +78,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     private static final int K_SECTION = 12;
     private static final int K_BUILTIN = 13;
     private static final int K_SAVED = 14;
+    private static final int K_PREVIEW = 15;
 
     private static final int ACT_RESET_PAGE = 100;
 
@@ -253,6 +255,9 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 case CrolSettingsRegistry.E_INFO:
                     rows.add(simple(K_INFO, e.title));
                     break;
+                case CrolSettingsRegistry.E_PREVIEW:
+                    rows.add(simple(K_PREVIEW, null));
+                    break;
                 case CrolSettingsRegistry.E_GHOST: {
                     Row g = simple(K_GHOST, "Режим призрака");
                     rows.add(g);
@@ -371,6 +376,7 @@ public class CrolGramSettingsActivity extends BaseFragment {
     @Override
     public void onResume() {
         super.onResume();
+        CrolConfig.maybeAutoBackup();
         if (!"search".equals(page) && adapter != null) {
             buildPage();
             adapter.notifyDataSetChanged();
@@ -565,6 +571,28 @@ public class CrolGramSettingsActivity extends BaseFragment {
                     refreshRows();
                 });
                 break;
+            case CrolSettingsRegistry.ACT_AUTO_THEME:
+                presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT));
+                break;
+            case CrolSettingsRegistry.ACT_WALLPAPERS:
+                presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL));
+                break;
+            case CrolSettingsRegistry.ACT_BACKUP_NOW: {
+                String path = CrolConfig.backupNow();
+                toast(path == null ? "Не удалось сохранить копию" : "Копия сохранена: " + path);
+                break;
+            }
+            case CrolSettingsRegistry.ACT_RESTORE_BACKUP: {
+                int n = CrolConfig.restoreBackup();
+                if (n < 0) {
+                    toast("Копия не найдена или повреждена");
+                } else {
+                    org.telegram.messenger.CrolProfile.refreshSelf();
+                    toast("Восстановлено значений: " + n);
+                    refreshRows();
+                }
+                break;
+            }
             case CrolSettingsRegistry.ACT_EXPORT:
                 AndroidUtilities.addToClipboard(CrolConfig.exportJson());
                 toast("Настройки скопированы");
@@ -809,6 +837,168 @@ public class CrolGramSettingsActivity extends BaseFragment {
         return box;
     }
 
+
+    /** Живой предпросмотр: два пузыря и аватарка с текущими настройками оформления. */
+    private static class PreviewView extends View {
+        private final android.graphics.Paint fill = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint stroke = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.text.TextPaint text = new android.text.TextPaint(android.text.TextPaint.ANTI_ALIAS_FLAG);
+        private final android.text.TextPaint name = new android.text.TextPaint(android.text.TextPaint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF rect = new android.graphics.RectF();
+        private final android.graphics.Path path = new android.graphics.Path();
+        private final float[] radii = new float[8];
+        private android.graphics.LinearGradient meShader;
+        private android.graphics.LinearGradient nameShader;
+        private int bubbleStyle;
+        private int avatarShape;
+        private boolean gradNames;
+        private int avatarColor;
+        private int bgColor;
+        private int inColor;
+        private int inText;
+        private int strokeColor;
+
+        PreviewView(Context context) {
+            super(context);
+            stroke.setStyle(android.graphics.Paint.Style.STROKE);
+            stroke.setStrokeWidth(AndroidUtilities.dp(1));
+            text.setTextSize(AndroidUtilities.dp(15));
+            name.setTextSize(AndroidUtilities.dp(13));
+            name.setTypeface(Typeface.DEFAULT_BOLD);
+            setMinimumHeight(AndroidUtilities.dp(176));
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), AndroidUtilities.dp(176));
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            rebuild();
+        }
+
+        void rebuild() {
+            bubbleStyle = CrolConfig.getInt("bubble_style", 0);
+            avatarShape = CrolConfig.getInt("avatar_shape", 0);
+            gradNames = CrolConfig.getBool("gradient_names", false);
+            bgColor = Theme.getColor(Theme.key_windowBackgroundGray);
+            inColor = Theme.getColor(Theme.key_windowBackgroundWhite);
+            inText = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
+            strokeColor = Theme.multAlpha(inText, 0.25f);
+            int w = getMeasuredWidth();
+            int[] me = org.telegram.messenger.CrolStyle.colorsFor(true, 0);
+            int[] other = org.telegram.messenger.CrolStyle.colorsFor(false, 1);
+            avatarColor = 0xFF000000 | other[0];
+            if (w > 0) {
+                float left = w - AndroidUtilities.dp(16 + 200);
+                meShader = new android.graphics.LinearGradient(left, 0, w - AndroidUtilities.dp(16), 0, opaque(me), null, android.graphics.Shader.TileMode.CLAMP);
+                nameShader = new android.graphics.LinearGradient(AndroidUtilities.dp(64), 0, AndroidUtilities.dp(124), 0, opaque(other), null, android.graphics.Shader.TileMode.CLAMP);
+            }
+            invalidate();
+        }
+
+        private static int[] opaque(int[] cols) {
+            int[] out = new int[cols.length];
+            for (int i = 0; i < cols.length; i++) {
+                out[i] = 0xFF000000 | cols[i];
+            }
+            return out;
+        }
+
+        private float bubbleRadius() {
+            switch (bubbleStyle) {
+                case 1:
+                    return AndroidUtilities.dp(4);
+                case 2:
+                    return AndroidUtilities.dp(10);
+                case 4:
+                    return AndroidUtilities.dp(24);
+                default:
+                    return AndroidUtilities.dp(18);
+            }
+        }
+
+        private void drawBubble(android.graphics.Canvas c, float l, float t, float r, float b, boolean mine) {
+            rect.set(l, t, r, b);
+            float rad = bubbleRadius();
+            fill.setShader(null);
+            if (mine && meShader != null) {
+                fill.setShader(meShader);
+                fill.setAlpha(bubbleStyle >= 3 ? 190 : 255);
+            } else {
+                fill.setColor(inColor);
+                fill.setAlpha(bubbleStyle >= 3 ? 190 : 255);
+            }
+            c.drawRoundRect(rect, rad, rad, fill);
+            if (bubbleStyle == 2 || bubbleStyle >= 3) {
+                stroke.setColor(strokeColor);
+                c.drawRoundRect(rect, rad, rad, stroke);
+            }
+        }
+
+        private void drawAvatar(android.graphics.Canvas c, float x, float y, float size) {
+            float s = size / 2f;
+            float small = AndroidUtilities.dp(4);
+            switch (avatarShape) {
+                case 1:
+                    java.util.Arrays.fill(radii, size * 0.3f);
+                    break;
+                case 2:
+                    java.util.Arrays.fill(radii, small);
+                    break;
+                case 3:
+                    radii[0] = radii[1] = radii[2] = radii[3] = radii[4] = radii[5] = s;
+                    radii[6] = radii[7] = small;
+                    break;
+                case 4:
+                    radii[0] = radii[1] = s;
+                    radii[2] = radii[3] = small;
+                    radii[4] = radii[5] = s;
+                    radii[6] = radii[7] = small;
+                    break;
+                default:
+                    java.util.Arrays.fill(radii, s);
+                    break;
+            }
+            rect.set(x, y, x + size, y + size);
+            path.reset();
+            path.addRoundRect(rect, radii, android.graphics.Path.Direction.CW);
+            fill.setShader(null);
+            fill.setColor(avatarColor);
+            c.drawPath(path, fill);
+            text.setColor(Color.WHITE);
+            text.setTextAlign(android.graphics.Paint.Align.CENTER);
+            c.drawText("К", x + s, y + s + AndroidUtilities.dp(5), text);
+            text.setTextAlign(android.graphics.Paint.Align.LEFT);
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            int w = getMeasuredWidth();
+            fill.setShader(null);
+            fill.setColor(bgColor);
+            canvas.drawRect(0, 0, w, getMeasuredHeight(), fill);
+            drawAvatar(canvas, AndroidUtilities.dp(16), AndroidUtilities.dp(18), AndroidUtilities.dp(40));
+            float l = AndroidUtilities.dp(64);
+            drawBubble(canvas, l, AndroidUtilities.dp(14), l + AndroidUtilities.dp(190), AndroidUtilities.dp(78), false);
+            if (gradNames && nameShader != null) {
+                name.setShader(nameShader);
+            } else {
+                name.setShader(null);
+                name.setColor(0xFF2EA6FF);
+            }
+            canvas.drawText("Кроль", l + AndroidUtilities.dp(12), AndroidUtilities.dp(34), name);
+            text.setColor(inText);
+            canvas.drawText("Как тебе оформление?", l + AndroidUtilities.dp(12), AndroidUtilities.dp(60), text);
+            float r = w - AndroidUtilities.dp(16);
+            drawBubble(canvas, r - AndroidUtilities.dp(200), AndroidUtilities.dp(94), r, AndroidUtilities.dp(142), true);
+            text.setColor(Color.WHITE);
+            canvas.drawText("Выглядит отлично", r - AndroidUtilities.dp(188), AndroidUtilities.dp(124), text);
+        }
+    }
+
     // ---------------------------------------------------------------- адаптер
 
     private class ListAdapter extends RecyclerListView.SelectionAdapter {
@@ -849,6 +1039,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 view = createTiles(context);
             } else if (viewType == TYPE_SEARCH) {
                 view = createSearchField(context);
+            } else if (viewType == TYPE_PREVIEW) {
+                view = new PreviewView(context);
             } else {
                 view = new TextInfoPrivacyCell(context);
             }
@@ -939,6 +1131,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                 }
             } else if (type == TYPE_INFO) {
                 ((TextInfoPrivacyCell) holder.itemView).setText(r.title);
+            } else if (type == TYPE_PREVIEW) {
+                ((PreviewView) holder.itemView).rebuild();
             } else if (type == TYPE_TILES) {
                 LinearLayout row = (LinearLayout) holder.itemView;
                 for (int i = 0; i < row.getChildCount() && i < 4; i++) {
@@ -975,6 +1169,8 @@ public class CrolGramSettingsActivity extends BaseFragment {
                     return TYPE_CARD;
                 case K_TILES:
                     return TYPE_TILES;
+                case K_PREVIEW:
+                    return TYPE_PREVIEW;
                 case K_SEARCH:
                     return TYPE_SEARCH;
                 default:

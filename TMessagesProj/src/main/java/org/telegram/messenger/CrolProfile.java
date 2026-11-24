@@ -98,6 +98,7 @@ public class CrolProfile {
         if (!isSelf(u)) {
             return;
         }
+        CrolConfig.maybeAutoBackup();
         try {
             if (origUser != u) {
                 origUser = u;

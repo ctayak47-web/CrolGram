@@ -516,6 +516,39 @@ public class CrolStyle {
     }
 
     /** Применить изменения настроек стиля без перезапуска: перерисовать открытые экраны. */
+    private static android.graphics.Typeface dotFace;
+    private static boolean dotTried;
+
+    private static android.graphics.Typeface dotFace() {
+        if (!dotTried) {
+            dotTried = true;
+            try {
+                dotFace = android.graphics.Typeface.createFromAsset(ApplicationLoader.applicationContext.getAssets(), "fonts/doto.ttf");
+            } catch (Throwable e) {
+                CrolConfig.logOnce("dotfont", "dot font load error: " + e);
+            }
+        }
+        return dotFace;
+    }
+
+    /** Точечный шрифт (Doto, SIL OFL) для времени и счётчиков непрочитанных в списке чатов. */
+    public static void applyDotFont() {
+        try {
+            android.graphics.Typeface t = CrolConfig.getBool("dot_font", false) ? dotFace() : null;
+            if (Theme.dialogs_timePaint != null) {
+                Theme.dialogs_timePaint.setTypeface(t);
+            }
+            if (Theme.dialogs_countTextPaint != null) {
+                Theme.dialogs_countTextPaint.setTypeface(t != null ? t : AndroidUtilities.bold());
+            }
+            if (Theme.dialogs_countTextPaint2 != null) {
+                Theme.dialogs_countTextPaint2.setTypeface(t != null ? t : AndroidUtilities.bold());
+            }
+        } catch (Throwable e) {
+            CrolConfig.logOnce("dotapply", "dot font apply error: " + e);
+        }
+    }
+
     public static void refreshUi() {
         AndroidUtilities.runOnUIThread(() -> {
             try {

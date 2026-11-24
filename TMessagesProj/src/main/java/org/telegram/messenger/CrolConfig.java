@@ -61,7 +61,7 @@ public class CrolConfig {
     /** Украшения, которые отключает режим «почти как Telegram» (значения сохраняются). */
     private static final HashSet<String> PLAIN_BOOL = new HashSet<>(java.util.Arrays.asList(
             "gradient_names", "grad_replies", "grad_dialogs", "grad_profile", "grad_title", "grad_drawer",
-            "name_glow", "grad_anim", "anim_typing"));
+            "name_glow", "grad_anim", "anim_typing", "dot_font"));
     private static final HashSet<String> PLAIN_INT = new HashSet<>(java.util.Arrays.asList(
             "bubble_style", "avatar_shape", "grad_text", "banner_mode"));
 
@@ -94,6 +94,9 @@ public class CrolConfig {
     /** Сохранённое значение без наложений (для экрана настроек). */
     public static boolean getRawBool(String key, boolean def) {
         try {
+            if ("glass_chat".equals(key)) {
+                return LiteMode.isEnabledSetting(LiteMode.FLAG_CHAT_BLUR);
+            }
             return p().getBoolean(key, def);
         } catch (Throwable e) {
             return def;
@@ -102,6 +105,9 @@ public class CrolConfig {
 
     public static int getRawInt(String key, int def) {
         try {
+            if ("dialog_lines".equals(key)) {
+                return SharedConfig.useThreeLinesLayout ? 1 : 0;
+            }
             return p().getInt(key, def);
         } catch (Throwable e) {
             return def;
@@ -198,7 +204,97 @@ public class CrolConfig {
         listeners.remove(l);
     }
 
+    private static void applyBuiltinBridges(String key) {
+        try {
+            if ("glass_chat".equals(key)) {
+                LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, p().getBoolean("glass_chat", false));
+            } else if ("dialog_lines".equals(key)) {
+                SharedConfig.setUseThreeLinesLayout(p().getInt("dialog_lines", 0) == 1);
+            } else if (key == null || "dot_font".equals(key) || "plain_mode".equals(key)) {
+                CrolStyle.applyDotFont();
+            }
+        } catch (Throwable e) {
+            logOnce("bridge" + key, "bridge error " + key + ": " + e);
+        }
+    }
+
+    // ---------------------------------------------------------------- резервная копия
+
+    private static long lastBackupCheck;
+
+    public static java.io.File backupFile() {
+        java.io.File d = ApplicationLoader.applicationContext.getExternalFilesDir(null);
+        if (d == null) {
+            d = ApplicationLoader.applicationContext.getFilesDir();
+        }
+        return new java.io.File(d, "crolgram_backup.json");
+    }
+
+    /** Пишет копию настроек в файл. Возвращает путь или null. */
+    public static String backupNow() {
+        try {
+            java.io.File f = backupFile();
+            String json = exportJson();
+            java.io.FileOutputStream out = new java.io.FileOutputStream(f);
+            out.write(json.getBytes("UTF-8"));
+            out.close();
+            p().edit().putString("backup_last", String.valueOf(System.currentTimeMillis())).apply();
+            return f.getAbsolutePath();
+        } catch (Throwable e) {
+            logOnce("backup", "backup error: " + e);
+            return null;
+        }
+    }
+
+    /** Возвращает число восстановленных значений или -1. */
+    public static int restoreBackup() {
+        try {
+            java.io.File f = backupFile();
+            if (!f.exists()) {
+                return -1;
+            }
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            byte[] buf = new byte[(int) f.length()];
+            int n = 0;
+            while (n < buf.length) {
+                int r = in.read(buf, n, buf.length - n);
+                if (r < 0) {
+                    break;
+                }
+                n += r;
+            }
+            in.close();
+            return importJson(new String(buf, 0, n, "UTF-8"));
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
+    public static long lastBackupTime() {
+        try {
+            return Long.parseLong(p().getString("backup_last", "0"));
+        } catch (Throwable e) {
+            return 0;
+        }
+    }
+
+    /** Раз в сутки делает копию, если включено. Вызывается часто, проверка не чаще раза в 10 минут. */
+    public static void maybeAutoBackup() {
+        long now = System.currentTimeMillis();
+        if (now - lastBackupCheck < 10 * 60 * 1000L) {
+            return;
+        }
+        lastBackupCheck = now;
+        try {
+            if (p().getBoolean("auto_backup", false) && now - lastBackupTime() > 24L * 3600 * 1000) {
+                Utilities.globalQueue.postRunnable(CrolConfig::backupNow);
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
     private static void notifyChanged(String key) {
+        applyBuiltinBridges(key);
         if (key == null || "plain_mode".equals(key) || "bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
             CrolStyle.refreshUi();
         }
