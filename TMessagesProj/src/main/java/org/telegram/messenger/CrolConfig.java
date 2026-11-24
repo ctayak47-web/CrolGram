@@ -108,6 +108,13 @@ public class CrolConfig {
             if ("dialog_lines".equals(key)) {
                 return SharedConfig.useThreeLinesLayout ? 1 : 0;
             }
+            if ("m3_font".equals(key)) {
+                return SharedConfig.useSystemBoldFont ? 1 : 0;
+            }
+            if ("m3_text_size".equals(key)) {
+                int fs = SharedConfig.fontSize;
+                return fs <= 14 ? 0 : fs <= 16 ? 1 : fs <= 18 ? 2 : 3;
+            }
             return p().getInt(key, def);
         } catch (Throwable e) {
             return def;
@@ -209,6 +216,20 @@ public class CrolConfig {
             if (key != null && (key.startsWith("m3_") || "design_m3".equals(key))) {
                 CrolMaterial.invalidate();
                 CrolMaterial.applyCornerStyle();
+            }
+            if ("m3_font".equals(key)) {
+                boolean want = p().getInt("m3_font", 0) == 1;
+                if (SharedConfig.useSystemBoldFont != want) {
+                    SharedConfig.toggleUseSystemBoldFont();
+                }
+            } else if ("m3_text_size".equals(key)) {
+                int[] sizes = {14, 16, 18, 20};
+                int idx = Math.max(0, Math.min(3, p().getInt("m3_text_size", 1)));
+                SharedConfig.fontSize = sizes[idx];
+                SharedConfig.fontSizeIsDefault = false;
+                ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Context.MODE_PRIVATE)
+                        .edit().putInt("fons_size", sizes[idx]).apply();
+                org.telegram.ui.ActionBar.Theme.createCommonMessageResources();
             }
             if ("glass_chat".equals(key)) {
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, p().getBoolean("glass_chat", false));

@@ -197,7 +197,8 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
                 imageView.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
             }
             progressView.setProgressColor(Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider));
-            final int color = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
+            final boolean crolM3 = org.telegram.messenger.CrolMaterial.isActive();
+            final int color = crolM3 ? org.telegram.messenger.CrolMaterial.roles().primaryContainer : Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
             final int pressedColor = Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider);
             if (recolorBackground) {
                 if (color != themedBackgroundColor || pressedColor != themedBackgroundPressedColor) {
@@ -210,7 +211,9 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             } else {
                 themedBackgroundColor = color;
                 themedBackgroundPressedColor = pressedColor;
-                setBackground(themedBackground = Theme.createSimpleSelectorCircleDrawable(dp(48), color, pressedColor));
+                setBackground(themedBackground = crolM3
+                        ? Theme.createSimpleSelectorRoundRectDrawable(dp(16), color, pressedColor)
+                        : Theme.createSimpleSelectorCircleDrawable(dp(48), color, pressedColor));
             }
         }
     }

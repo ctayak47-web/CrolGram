@@ -574,6 +574,9 @@ public class CrolGramSettingsActivity extends BaseFragment {
             case CrolSettingsRegistry.ACT_AUTO_THEME:
                 presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT));
                 break;
+            case CrolSettingsRegistry.ACT_LITE_MODE:
+                presentFragment(new LiteModeSettingsActivity());
+                break;
             case CrolSettingsRegistry.ACT_WALLPAPERS:
                 presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL));
                 break;

@@ -36,6 +36,7 @@ public class CrolSettingsRegistry {
     public static final int ACT_WALLPAPERS = 13;
     public static final int ACT_BACKUP_NOW = 14;
     public static final int ACT_RESTORE_BACKUP = 15;
+    public static final int ACT_LITE_MODE = 16;
 
     public static final String NOTE_LOCAL = "Только на этом устройстве: другие люди и серверы Telegram ничего не увидят.";
     public static final String MARK_LOCAL = "Только на этом устройстве";
@@ -217,10 +218,16 @@ public class CrolSettingsRegistry {
         p.select("m3_mode", "Тема", 0, "Авто (как в Telegram)", "Светлая", "Тёмная", "AMOLED")
                 .kw("тема светлая тёмная amoled чёрная авто").local();
         p.select("m3_contrast", "Контраст", 0, "Стандартный", "Средний", "Высокий").kw("контраст доступность").local();
+        p.header("Шрифт");
+        p.select("m3_font", "Жирный шрифт", 0, "Roboto (как в Telegram)", "Системный").kw("шрифт roboto системный жирный font").local();
+        p.select("m3_text_size", "Размер текста сообщений", 1, "Мелкий (14)", "Обычный (16)", "Крупный (18)", "Очень крупный (20)")
+                .kw("размер текста шрифт масштаб крупный мелкий").local();
         p.header("Формы");
         p.select("m3_corner", "Углы пузырей", 3, "Острые", "Умеренные", "Круглые", "Максимально круглые")
                 .kw("углы скругление радиус форма shape").local();
         p.link("Форма аватарок и стиль пузырей", "look");
+        p.header("Анимации");
+        p.action("Анимации и экономия (встроенные настройки Telegram)", ACT_LITE_MODE);
         p.info("Цвета Material 3 строятся из выбранного цвета и подменяют цвета темы Telegram. В режиме «Авто» светлая или тёмная схема выбирается по текущей теме Telegram; для принудительной смены темы используйте «Автотему» в разделе «Внешний вид». " + NOTE_LOCAL);
 
         // ------------------------------------------------ Внешний вид
