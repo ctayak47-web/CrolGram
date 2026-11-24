@@ -9133,6 +9133,10 @@ public class Theme {
     }
 
     public static int getColor(int key, boolean[] isDefault, boolean ignoreAnimation) {
+        final int crolM3 = org.telegram.messenger.CrolMaterial.get(key);
+        if (crolM3 != org.telegram.messenger.CrolMaterial.NONE) {
+            return crolM3;
+        }
         if (SharedConfig.compactMode) {
             // compact mode swaps some message colors for its own keys, see getCompactColor
             final Integer compactColor = getCompactColor(key, null);

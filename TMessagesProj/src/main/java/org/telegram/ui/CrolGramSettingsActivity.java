@@ -886,6 +886,12 @@ public class CrolGramSettingsActivity extends BaseFragment {
             bgColor = Theme.getColor(Theme.key_windowBackgroundGray);
             inColor = Theme.getColor(Theme.key_windowBackgroundWhite);
             inText = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
+            if (org.telegram.messenger.CrolMaterial.isActive()) {
+                org.telegram.messenger.CrolMaterial.Roles m = org.telegram.messenger.CrolMaterial.roles();
+                bgColor = m.surface;
+                inColor = m.surfaceContainerHigh;
+                inText = m.onSurface;
+            }
             strokeColor = Theme.multAlpha(inText, 0.25f);
             int w = getMeasuredWidth();
             int[] me = org.telegram.messenger.CrolStyle.colorsFor(true, 0);
@@ -957,6 +963,18 @@ public class CrolGramSettingsActivity extends BaseFragment {
                     radii[2] = radii[3] = small;
                     radii[4] = radii[5] = s;
                     radii[6] = radii[7] = small;
+                    break;
+                case 5:
+                    radii[0] = radii[1] = s;
+                    radii[2] = radii[3] = s * 0.45f;
+                    radii[4] = radii[5] = s;
+                    radii[6] = radii[7] = s * 0.45f;
+                    break;
+                case 6:
+                    radii[0] = radii[1] = s * 0.8f;
+                    radii[2] = radii[3] = s * 0.35f;
+                    radii[4] = radii[5] = s * 0.8f;
+                    radii[6] = radii[7] = s * 0.35f;
                     break;
                 default:
                     java.util.Arrays.fill(radii, s);

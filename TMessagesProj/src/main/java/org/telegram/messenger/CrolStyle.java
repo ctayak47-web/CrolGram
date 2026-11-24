@@ -356,6 +356,15 @@ public class CrolStyle {
                 int small = (int) (r * 0.15f);
                 return new int[]{r, small, r, small};
             }
+            case 5: {
+                int small = (int) (r * 0.45f);
+                return new int[]{r, small, r, small};
+            }
+            case 6: {
+                int big = (int) (r * 0.8f);
+                int small = (int) (r * 0.35f);
+                return new int[]{big, small, big, small};
+            }
             default:
                 return null;
         }

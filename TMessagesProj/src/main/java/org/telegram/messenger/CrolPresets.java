@@ -20,7 +20,8 @@ public class CrolPresets {
     public static final String[] KEYS = {
             "bubble_style", "avatar_shape", "gradient_names", "grad_me", "grad_me_custom", "grad_others",
             "grad_others_custom", "grad_replies", "grad_dialogs", "grad_profile", "grad_title", "grad_drawer",
-            "grad_text", "name_glow", "grad_anim", "anim_typing", "banner_mode", "banner_grad"
+            "grad_text", "name_glow", "grad_anim", "anim_typing", "banner_mode", "banner_grad",
+            "design_m3", "m3_scheme", "m3_seed", "m3_mode", "m3_contrast", "m3_corner"
     };
 
     private static SharedPreferences p() {

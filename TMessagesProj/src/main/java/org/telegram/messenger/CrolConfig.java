@@ -206,6 +206,10 @@ public class CrolConfig {
 
     private static void applyBuiltinBridges(String key) {
         try {
+            if (key != null && (key.startsWith("m3_") || "design_m3".equals(key))) {
+                CrolMaterial.invalidate();
+                CrolMaterial.applyCornerStyle();
+            }
             if ("glass_chat".equals(key)) {
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, p().getBoolean("glass_chat", false));
             } else if ("dialog_lines".equals(key)) {
@@ -295,7 +299,7 @@ public class CrolConfig {
 
     private static void notifyChanged(String key) {
         applyBuiltinBridges(key);
-        if (key == null || "plain_mode".equals(key) || "bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
+        if (key == null || "plain_mode".equals(key) || key.startsWith("m3_") || "design_m3".equals(key) || "bubble_style".equals(key) || "avatar_shape".equals(key) || key.startsWith("grad") || "gradient_names".equals(key) || "name_glow".equals(key)) {
             CrolStyle.refreshUi();
         }
         for (Listener l : listeners) {

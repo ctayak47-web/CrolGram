@@ -180,7 +180,7 @@ public class CrolSettingsRegistry {
 
     /** Порядок разделов на главной странице. */
     public static final String[] MAIN_SECTIONS = {
-            "look", "dialogs", "chat", "profile", "privacy", "auto", "tools", "backup", "about"
+            "design", "look", "dialogs", "chat", "profile", "privacy", "auto", "tools", "backup", "about"
     };
 
     private static Page page(String id, String title, int icon) {
@@ -203,6 +203,26 @@ public class CrolSettingsRegistry {
         String[] presets = CrolStyle.PRESET_NAMES;
         Page p;
 
+        // ------------------------------------------------ Дизайн Material 3
+        p = page("design", "Дизайн Material 3", R.drawable.msg_customize);
+        p.preview();
+        p.header("Дизайн");
+        p.sw("design_m3", "Material 3", "Выключите, чтобы вернуть классический вид Telegram", true)
+                .kw("material дизайн классический telegram m3 material you").local();
+        p.header("Цвет");
+        p.select("m3_scheme", "Цветовая схема", 1, "Динамическая (обои, Android 12+)", "Зелёная CrolGram", "Свой цвет",
+                "Кислота", "Неон", "Лес", "Закат", "Мята").kw("цвет схема палитра dynamic seed динамический обои").local();
+        p.input("m3_seed", "Свой цвет (HEX)", "#2EE66B", "Например #2EE66B. Используется при схеме «Свой цвет»")
+                .kw("hex цвет seed свой").local();
+        p.select("m3_mode", "Тема", 0, "Авто (как в Telegram)", "Светлая", "Тёмная", "AMOLED")
+                .kw("тема светлая тёмная amoled чёрная авто").local();
+        p.select("m3_contrast", "Контраст", 0, "Стандартный", "Средний", "Высокий").kw("контраст доступность").local();
+        p.header("Формы");
+        p.select("m3_corner", "Углы пузырей", 3, "Острые", "Умеренные", "Круглые", "Максимально круглые")
+                .kw("углы скругление радиус форма shape").local();
+        p.link("Форма аватарок и стиль пузырей", "look");
+        p.info("Цвета Material 3 строятся из выбранного цвета и подменяют цвета темы Telegram. В режиме «Авто» светлая или тёмная схема выбирается по текущей теме Telegram; для принудительной смены темы используйте «Автотему» в разделе «Внешний вид». " + NOTE_LOCAL);
+
         // ------------------------------------------------ Внешний вид
         p = page("look", "Внешний вид", R.drawable.msg_palette);
         p.preview();
@@ -212,7 +232,7 @@ public class CrolSettingsRegistry {
         p.header("Оформление");
         p.select("bubble_style", "Стиль пузырей", 0, "Стандартный", "Pixel", "Nothing", "Glass", "Liquid Glass")
                 .kw("пузыри сообщения bubble стекло nothing pixel").local();
-        p.select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик")
+        p.select("avatar_shape", "Форма аватарок", 0, "Круг", "Скруглённый квадрат", "Квадрат", "Капля", "Листик", "Цветок", "Клевер")
                 .kw("аватар фото форма круг квадрат avatar").local();
         p.header("Шрифт");
         p.sw("dot_font", "Точечный шрифт", "Время и счётчики в списке чатов шрифтом Doto (лицензия OFL)", false)
